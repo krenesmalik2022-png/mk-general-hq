@@ -128,6 +128,14 @@ export default function GeneralHQ() {
     }
   }, [tick, loaded, activeEvent]);
 
+  useEffect(() => {
+    if (!loaded) return;
+    if (tick % 60 === 0 && tick > 0) {
+      updateGeneral({ budget: (general.budget || 800) + 50 });
+      notify("BUDGET ALLOCATION RECEIVED: +$50M", "#ffd700");
+    }
+  }, [tick, loaded]);
+
   function notify(msg, color = "#4caf50") {
     setNotification({ msg, color });
     setTimeout(() => setNotification(null), 4000);
@@ -141,6 +149,7 @@ export default function GeneralHQ() {
       approval: Math.max(0, Math.min(100, (general.approval || 70) + (e.approval || 0))),
       defcon: Math.max(1, Math.min(5, (general.defcon || 4) + (e.defcon || 0))),
       prestige: Math.max(0, Math.min(100, (general.prestige || 60) + (e.prestige || 0))),
+      budget: (general.budget || 800) + (e.budget || 0),
       eventLog: [...(general.eventLog || []), evt.id],
     });
     setEventResult({ outcome: choice.outcome, effect: e });
@@ -149,16 +158,23 @@ export default function GeneralHQ() {
   }
 
   function deployUnit(unit, zone) {
+    const cost = unit.cost || 0;
+    if (general.budget < cost) {
+      notify(`INSUFFICIENT FUNDS: $${cost}M required`, "#e84b4b");
+      return;
+    }
+
     const newDep = { unitId: unit.id, unitName: unit.name, zoneName: zone.name, lat: zone.lat, lon: zone.lon, color: zone.color, deployed: new Date().toLocaleDateString() };
     updateGeneral({
       deployments: [...(general.deployments || []), newDep],
       forcesDeployed: (general.forcesDeployed || 140000) + unit.strength,
       activeTheatres: Math.min(8, (general.activeTheatres || 4) + 1),
       prestige: Math.min(100, (general.prestige || 60) + 3),
+      budget: general.budget - cost,
     });
     setShowDeploy(null);
     setSelectedZone(null);
-    notify(`${unit.name} deployed to ${zone.name}`, unit.id === "delta" ? "#e8b84b" : "#4caf50");
+    notify(`${unit.name} deployed to ${zone.name} (-$${cost}M)`, unit.id === "delta" ? "#e8b84b" : "#4caf50");
   }
 
   function awardMedal(gen2, medal) {
@@ -251,6 +267,10 @@ export default function GeneralHQ() {
                 <div style={{ fontFamily: "Oswald,sans-serif", fontSize: 18, letterSpacing: 6 }} className="glow-gold">GEN. {general.name}</div>
               </div>
               <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+                <div style={{ textAlign: "center", minWidth: 60 }}>
+                  <div style={{ fontSize: 16, color: "#ffd700", fontFamily: "Oswald,sans-serif" }}>${general.budget}M</div>
+                  <div style={{ fontSize: 7, color: "#a08000" }}>OPERATIONAL BUDGET</div>
+                </div>
                 <div style={{ textAlign: "center" }}>
                   <div style={{ fontSize: 16, color: approvalColor(ap), fontFamily: "Oswald,sans-serif" }}>{ap}%</div>
                   <div style={{ fontSize: 7, color: approvalColor(ap) }}>{approvalLabel(ap)}</div>
