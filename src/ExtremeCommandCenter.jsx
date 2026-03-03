@@ -433,6 +433,33 @@ export default function GeneralHQ() {
   const [pressMsg, setPressMsg] = useState("");
   const [pressResult, setPressResult] = useState(null);
   const [presidentialMeet, setPresidentialMeet] = useState(null);
+  const [nuclearWinter, setNuclearWinter] = useState(false);
+  const [bankBalance, setBankBalance] = useState(0);
+  const [branchBudgets, setBranchBudgets] = useState({ army: 185, navy: 202, airforce: 216, marines: 53, spaceforce: 30 });
+  const [heroRoster, setHeroRoster] = useState([]);
+  const [purchases, setPurchases] = useState([]);
+
+  // Income tick
+  useEffect(() => {
+    if (!loaded) return;
+    if (tick > 0 && tick % 10 === 0 && !nuclearWinter) {
+      setBankBalance(b => b + 5000); // 5k salary every 10 ticks
+    }
+  }, [tick, loaded, nuclearWinter]);
+
+  // Random Hero Events
+  useEffect(() => {
+    if (!loaded || nuclearWinter) return;
+    if (tick > 0 && tick % 25 === 0 && Math.random() > 0.5) {
+      const names = ["Sgt. Miller", "Cpl. Hernandez", "Pvt. Jackson", "Lt. Vance", "SFC. Dubois"];
+      const acts = ["held off an ambush", "rescued a downed pilot", "secured a critical intel cache", "eliminated a high value target", "defended a medical convoy"];
+      const locs = ["Syria", "Somalia", "Yemen", "Afghanistan", "Mali"];
+      const newHero = { id: Date.now(), name: names[Math.floor(Math.random() * names.length)], action: acts[Math.floor(Math.random() * acts.length)], location: locs[Math.floor(Math.random() * locs.length)], promoted: false };
+      setHeroRoster(r => [newHero, ...r].slice(0, 10));
+      notify(`Heroic Action: ${newHero.name} ${newHero.action} in ${newHero.location}`, "#ffd700");
+    }
+  }, [tick, loaded, nuclearWinter]);
+
   const tick = useTick(1000);
 
   /* Load/save */
@@ -561,6 +588,29 @@ export default function GeneralHQ() {
     </>
   );
 
+  if (nuclearWinter) return (
+    <>
+      <style>{CSS}</style>
+      <div className="root" style={{ background: "#050000", position: "relative" }}>
+        <div className="crt-lines" />
+        <div style={{ position: "fixed", inset: 0, pointerEvents: "none", zIndex: 99, background: "repeating-linear-gradient(0deg, #111, #111 2px, transparent 2px, transparent 4px)", opacity: 0.15, animation: "blink 0.1s infinite" }} />
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "100vh", textAlign: "center", padding: 20 }}>
+          <div style={{ fontSize: 120, color: "#440000", textShadow: "0 0 40px #ff0000", marginBottom: 20, animation: "redPulse 3s infinite" }}>☢</div>
+          <div style={{ fontSize: 32, fontFamily: "Oswald,sans-serif", color: "#ff3333", letterSpacing: 10, marginBottom: 16 }}>POST-EXCHANGE ASSESSMENT</div>
+          <div style={{ maxWidth: 600, background: "#110000", border: "1px solid #330000", padding: 30 }}>
+            <div style={{ fontSize: 12, color: "#aa5555", lineHeight: 2, marginBottom: 20 }}>
+              SIOP Alpha execution confirmed. 300kt W87-1 yield delivered. <br />
+              Retaliatory strikes detected across North America and Europe. <br />
+              Estimated casualties: 850,000,000. <br />
+              Command authority lost. Continuity of Government has failed.
+            </div>
+            <div style={{ fontSize: 16, color: "#ff6666", letterSpacing: 4, animation: "blink 2s infinite" }}>END OF SIMULATION</div>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+
   const ap = general.approval || 70;
   const def = general.defcon || 4;
   const pres = general.prestige || 60;
@@ -587,7 +637,7 @@ export default function GeneralHQ() {
         )}
 
         {/* NUCLEAR LAUNCH */}
-        {showNuclear && <NuclearLaunch defcon={def} onClose={() => setShowNuclear(false)} onLaunch={() => { updateGeneral({ defcon: 1, approval: Math.max(0, ap - 60), prestige: Math.min(100, pres + 10) }); }} />}
+        {showNuclear && <NuclearLaunch defcon={def} onClose={() => setShowNuclear(false)} onLaunch={() => { setNuclearWinter(true); }} />}
 
         {/* INCOMING EVENT MODAL */}
         {activeEvent && !eventResult && (
@@ -760,13 +810,16 @@ export default function GeneralHQ() {
           {/* TABS */}
           <div style={{ background: "#050a05", borderBottom: "1px solid #1a2a1a", padding: "0 16px", display: "flex", gap: 0, overflowX: "auto" }}>
             {[
-              { id: "situation", label: "🌍 SITUATION ROOM" },
+              { id: "situation", label: "🌍 NMCC" },
               { id: "forces", label: "⚡ FORCE COMMAND" },
+              { id: "budget", label: "💰 JOINT STAFF BUDGET" },
+              { id: "personnel", label: "🎖 PERSONNEL COMMAND" },
               { id: "intel", label: "🔍 GLOBAL INTEL" },
               { id: "awards", label: "🏅 AWARDS" },
               { id: "politics", label: "🏛 POLITICS" },
               { id: "coup", label: "⚠ COUPS & THREATS" },
               { id: "press", label: "📡 PRESS BRIEFING" },
+              { id: "quarters", label: "🥃 GENERAL'S QUARTERS" },
             ].map(t => (
               <button key={t.id} className={`tab-btn${tab === t.id ? " active" : ""}`} onClick={() => setTab(t.id)}>
                 {t.label}
@@ -994,6 +1047,145 @@ export default function GeneralHQ() {
                       <div style={{ fontSize: 9, color: "#ffd700", marginBottom: 4 }}>TOTAL MEDALS AWARDED</div>
                       <div style={{ fontSize: 32, color: "#ffd700", fontFamily: "Oswald,sans-serif" }}>{general.medalsAwarded || 0}</div>
                       <div style={{ fontSize: 8, color: "#5a5a3a", marginTop: 4 }}>by General {general.name}</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ══ JOINT STAFF BUDGET ══ */}
+            {tab === "budget" && (
+              <div style={{ animation: "fadeUp 0.3s" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+                  <div>
+                    <div style={{ fontSize: 9, color: "#ffd700", letterSpacing: 4, marginBottom: 12 }}>◈ BRANCH BUDGET ALLOCATIONS (FY2024 IN BILLIONS)</div>
+                    {Object.entries(branchBudgets).map(([branch, amt]) => (
+                      <div key={branch} className="panel" style={{ padding: 16, marginBottom: 8, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <div style={{ fontSize: 12, color: "#c8ffc8", letterSpacing: 2, textTransform: "uppercase" }}>{branch}</div>
+                        <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+                          <button className="btn btn-red" style={{ padding: "4px 10px" }} onClick={() => { if (amt > 10) setBranchBudgets(b => ({ ...b, [branch]: b[branch] - 10 })) }}>-$10B</button>
+                          <div style={{ fontSize: 14, color: "#ffd700", width: 60, textAlign: "center", fontFamily: "Oswald,sans-serif" }}>${amt}</div>
+                          <button className="btn" style={{ padding: "4px 10px", borderColor: "#4caf50", color: "#4caf50" }} onClick={() => setBranchBudgets(b => ({ ...b, [branch]: b[branch] + 10 }))}>+$10B</button>
+                        </div>
+                      </div>
+                    ))}
+                    <div className="panel-gold" style={{ padding: 16, marginTop: 14 }}>
+                      <div style={{ fontSize: 9, color: "#7a6a3a" }}>TOTAL DOD DISCRETIONARY BUDGET</div>
+                      <div style={{ fontSize: 24, color: "#ffd700", fontFamily: "Oswald,sans-serif" }}>${Object.values(branchBudgets).reduce((a, b) => a + b, 0)} BILLION</div>
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 9, color: "#4b9ae8", letterSpacing: 4, marginBottom: 12 }}>◈ BUDGET IMPACT ASSESSMENT</div>
+                    <div className="panel" style={{ padding: 16, marginBottom: 10 }}>
+                      <div style={{ fontSize: 10, color: "#c8ffc8", marginBottom: 6 }}>NAVY FLEET READINESS</div>
+                      <div style={{ height: 4, background: "#0a1a0a" }}><div style={{ height: "100%", width: `${Math.min(100, branchBudgets.navy / 2.5)}%`, background: "#4b9ae8" }} /></div>
+                      <div style={{ fontSize: 8, color: "#5a7a5a", marginTop: 4 }}>High funding enables carrier strike group deployments.</div>
+                    </div>
+                    <div className="panel" style={{ padding: 16, marginBottom: 10 }}>
+                      <div style={{ fontSize: 10, color: "#c8ffc8", marginBottom: 6 }}>AIR FORCE STRATEGIC DETERRENCE</div>
+                      <div style={{ height: 4, background: "#0a1a0a" }}><div style={{ height: "100%", width: `${Math.min(100, branchBudgets.airforce / 2.5)}%`, background: "#4bcde8" }} /></div>
+                      <div style={{ fontSize: 8, color: "#5a7a5a", marginTop: 4 }}>B-21 platform development running on schedule.</div>
+                    </div>
+                    <div className="panel" style={{ padding: 16 }}>
+                      <div style={{ fontSize: 10, color: "#c8ffc8", marginBottom: 6 }}>SPACE FORCE C4ISR</div>
+                      <div style={{ height: 4, background: "#0a1a0a" }}><div style={{ height: "100%", width: `${Math.min(100, branchBudgets.spaceforce)}%`, background: "#9b59b6" }} /></div>
+                      <div style={{ fontSize: 8, color: "#5a7a5a", marginTop: 4 }}>Early warning satellite constellation operational capacity.</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ══ PERSONNEL COMMAND ══ */}
+            {tab === "personnel" && (
+              <div style={{ animation: "fadeUp 0.3s" }}>
+                <div style={{ fontSize: 9, color: "#4caf50", letterSpacing: 4, marginBottom: 12 }}>◈ ENLISTED HERO ROSTER — FIELD REPORTS</div>
+                {heroRoster.length === 0 && <div style={{ fontSize: 10, color: "#5a7a5a", fontStyle: "italic", padding: 20 }}>No outstanding field citations at this time. Wait for situational updates.</div>}
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+                  {heroRoster.map(hero => (
+                    <div key={hero.id} className="panel" style={{ padding: 16, borderLeft: "3px solid #ffd700" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+                        <div style={{ fontSize: 12, color: "#c8ffc8", letterSpacing: 1 }}>{hero.name}</div>
+                        {hero.promoted && <div style={{ fontSize: 8, color: "#ffd700", border: "1px solid #ffd700", padding: "2px 6px" }}>COMMENDED</div>}
+                      </div>
+                      <div style={{ fontSize: 9, color: "#7a9a7a", marginBottom: 12 }}>
+                        Action: <span style={{ color: "#fff" }}>{hero.action}</span><br />
+                        Location: {hero.location}
+                      </div>
+                      {!hero.promoted && (
+                        <div style={{ display: "flex", gap: 8 }}>
+                          <button className="btn btn-gold" style={{ flex: 1, padding: "6px" }} onClick={() => { setHeroRoster(r => r.map(h => h.id === hero.id ? { ...h, promoted: true } : h)); notify("Medal pinned. Morale increased.", "#ffd700"); updateGeneral({ prestige: pres + 2 }); }}>PIN MEDAL (+2 PR)</button>
+                          <button className="btn" style={{ flex: 1, padding: "6px", borderColor: "#4b9ae8", color: "#4b9ae8" }} onClick={() => { setHeroRoster(r => r.map(h => h.id === hero.id ? { ...h, promoted: true } : h)); notify("OVAL OFFICE MEETING ARRANGED", "#4b9ae8"); updateGeneral({ prestige: pres + 8, approval: Math.max(0, ap - 5) }); }}>POTUS MEET (+8 PR, -5 AP)</button>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* ══ GENERAL'S QUARTERS ══ */}
+            {tab === "quarters" && (
+              <div style={{ animation: "fadeUp 0.3s" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+                  <div>
+                    <div style={{ fontSize: 9, color: "#e8b84b", letterSpacing: 4, marginBottom: 12 }}>◈ PERSONAL FINANCES & LIFESTYLE</div>
+                    <div className="panel-gold" style={{ padding: 24, textAlign: "center", marginBottom: 14 }}>
+                      <div style={{ fontSize: 10, color: "#7a6a3a", letterSpacing: 2 }}>OFFSHORE / PERSONAL ACCOUNT</div>
+                      <div style={{ fontSize: 42, color: "#ffd700", fontFamily: "Oswald,sans-serif", letterSpacing: 2, textShadow: "0 0 20px #ffd70066" }}>
+                        ${bankBalance.toLocaleString()}
+                      </div>
+                      <div style={{ fontSize: 8, color: "#5a5a3a", marginTop: 4 }}>Base Salary: $15,000/mo · Hazard Pay Included</div>
+                    </div>
+
+                    <div style={{ fontSize: 9, color: "#7a6a3a", letterSpacing: 2, marginBottom: 8 }}>PRESTIGE EXPENDITURES:</div>
+                    {[
+                      { item: "Vintage Cuban Cigars", cost: 2000, desc: "For the Situation Room. (+1 PR)" },
+                      { item: "Georgetown Mansion Rent", cost: 15000, desc: "Impress senators at dinner. (+3 PR, +2 AP)" },
+                      { item: "Lobbyist Extravaganza", cost: 45000, desc: "Throw a massive secret gala. (+10 AP)" },
+                      { item: "Private Cayman Island", cost: 250000, desc: "Ultimate exit strategy. (+25 PR)" },
+                    ].map(p => {
+                      const owned = purchases.includes(p.item);
+                      return (
+                        <div key={p.item} className="choice-card" style={{ marginBottom: 6, borderColor: owned ? "#ffd700" : "#2a2a00" }} onClick={() => {
+                          if (owned) return;
+                          if (bankBalance >= p.cost) {
+                            setBankBalance(b => b - p.cost);
+                            setPurchases([...purchases, p.item]);
+                            notify(`Purchased: ${p.item}`, "#ffd700");
+                            if (p.cost === 2000) updateGeneral({ prestige: pres + 1 });
+                            if (p.cost === 15000) updateGeneral({ prestige: pres + 3, approval: Math.min(100, ap + 2) });
+                            if (p.cost === 45000) updateGeneral({ approval: Math.min(100, ap + 10) });
+                            if (p.cost === 250000) updateGeneral({ prestige: pres + 25 });
+                          } else {
+                            notify("INSUFFICIENT FUNDS", "#e84b4b");
+                          }
+                        }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                            <div>
+                              <div style={{ fontSize: 11, color: owned ? "#ffd700" : "#c8b870", letterSpacing: 1 }}>{p.item}</div>
+                              <div style={{ fontSize: 8, color: "#5a5a3a", marginTop: 2 }}>{p.desc}</div>
+                            </div>
+                            <div style={{ fontSize: 10, color: owned ? "#4caf50" : bankBalance >= p.cost ? "#ffd700" : "#e84b4b", fontFamily: "Oswald,sans-serif" }}>
+                              {owned ? "OWNED" : `$${p.cost.toLocaleString()}`}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 9, color: "#8aaa7a", letterSpacing: 4, marginBottom: 12 }}>◈ QUARTERS INVENTORY</div>
+                    <div className="panel" style={{ padding: 16, border: "1px solid #1a2a1a", minHeight: 200 }}>
+                      {purchases.length === 0 ? (
+                        <div style={{ fontSize: 9, color: "#3a5a3a", fontStyle: "italic", textAlign: "center", marginTop: 60 }}>You live a Spartan life. No luxuries acquired yet.</div>
+                      ) : (
+                        <ul style={{ paddingLeft: 16 }}>
+                          {purchases.map(p => (
+                            <li key={p} style={{ fontSize: 10, color: "#c8ffc8", marginBottom: 8, letterSpacing: 1 }}>{p}</li>
+                          ))}
+                        </ul>
+                      )}
                     </div>
                   </div>
                 </div>
