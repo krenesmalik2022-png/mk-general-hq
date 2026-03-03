@@ -441,13 +441,66 @@ export default function GeneralHQ() {
   const [missions, setMissions] = useState([]);
   const [stateThreats, setStateThreats] = useState([]);
   const [showPotus, setShowPotus] = useState(false);
+  const [blackBudget, setBlackBudget] = useState(0);
+  const [inbox, setInbox] = useState([]);
+  const [activeCall, setActiveCall] = useState(null);
+  const [activeContracts, setActiveContracts] = useState([]);
+
   const tick = useTick(1000);
 
-  // Income tick
+  // Income & Operations tick
   useEffect(() => {
     if (!loaded) return;
     if (tick > 0 && tick % 10 === 0 && !nuclearWinter) {
-      setBankBalance(b => b + 5000); // 5k salary every 10 ticks
+      setBankBalance(b => b + 25000); // Massive salary bump to 25k
+    }
+
+    // Process Contracts
+    if (tick > 0 && activeContracts.length > 0 && !nuclearWinter) {
+      setActiveContracts(prev => prev.map(c => {
+        if (c.progress >= 100) return c;
+        const newP = c.progress + (10 + Math.floor(Math.random() * 20));
+        if (newP >= 100) {
+          setTimeout(() => {
+            const success = Math.random() > c.risk;
+            if (success) {
+              updateGeneral({ prestige: Math.min(100, (general.prestige || 60) + c.reward.pr), approval: Math.min(100, (general.approval || 70) + c.reward.ap) });
+              notify(`SHADOW OP PHOENIX: SUCCESS`, "#4caf50");
+            } else {
+              updateGeneral({ prestige: Math.max(0, (general.prestige || 60) - c.penalty.pr), approval: Math.max(0, (general.approval || 70) - c.penalty.ap) });
+              notify(`SHADOW OP PHOENIX: COMPROMISED. DENY INVOLVEMENT.`, "#e84b4b");
+            }
+          }, 0);
+          return { ...c, progress: 100, status: success ? "SUCCESS" : "COMPROMISED" };
+        }
+        return { ...c, progress: newP };
+      }));
+    }
+  }, [tick, loaded, nuclearWinter, activeContracts]);
+
+  // Secure Comms Simulation
+  useEffect(() => {
+    if (!loaded || nuclearWinter) return;
+    if (tick > 0 && tick % 40 === 0 && Math.random() > 0.4) {
+      const senders = ["CIA Director", "Gen. Webb", "Adm. Torres", "MI6 Liaison", "Mossad Direct"];
+      const subjects = ["Urgent: Intercepted SIGINT", "Backchannel Request", "Eyes Only: Operation Compromised", "Deniable Assets Required", "Off-the-books Meeting"];
+      const messages = [
+        "We have actionable intel on a high-value target in the Sahel but no footprint. We need JSOC assets, off the books.",
+        "General, there's a leak in the Senate committee. They know about the black budget transfer. Advise.",
+        "My operatives have cornered an arms dealer in Vienna. If we move now, we secure next-gen drone tech, but it's a mess.",
+        "We're seeing unusual activity around the Iranian nuclear sites. Can you authorize a close-pass reconnaissance?",
+        "POTUS is looking weak in the polls. A decisive covert action right now would change the narrative. Do we have something ready?"
+      ];
+      const newEmail = {
+        id: Date.now(),
+        sender: senders[Math.floor(Math.random() * senders.length)],
+        subject: subjects[Math.floor(Math.random() * subjects.length)],
+        body: messages[Math.floor(Math.random() * messages.length)],
+        read: false,
+        time: new Date().toLocaleTimeString()
+      };
+      setInbox(prev => [newEmail, ...prev].slice(0, 15));
+      notify(`SECURE INBOX: New message from ${newEmail.sender}`, "#e8b84b");
     }
   }, [tick, loaded, nuclearWinter]);
 
@@ -873,7 +926,9 @@ export default function GeneralHQ() {
               { id: "coup", label: "⚠ COUPS & THREATS" },
               { id: "press", label: "📡 PRESS BRIEFING" },
               { id: "missions", label: "🎯 MISSIONS" },
+              { id: "shadow", label: "🦅 SHADOW OPS" },
               { id: "threats", label: "🚨 STATE THREATS" },
+              { id: "comms", label: "✉ SECURE COMMS" },
               { id: "quarters", label: "🥃 GENERAL'S QUARTERS" },
             ].map(t => (
               <button key={t.id} className={`tab-btn${tab === t.id ? " active" : ""}`} onClick={() => setTab(t.id)}>
@@ -1498,6 +1553,27 @@ export default function GeneralHQ() {
                       <div style={{ fontSize: 9, color: "#7a6a3a" }}>TOTAL DOD DISCRETIONARY BUDGET</div>
                       <div style={{ fontSize: 24, color: "#ffd700", fontFamily: "Oswald,sans-serif" }}>${Object.values(branchBudgets).reduce((a, b) => a + b, 0)} BILLION</div>
                     </div>
+
+                    {/* BLACK BUDGET SIPHON */}
+                    <div className="panel" style={{ padding: 16, marginTop: 14, borderLeft: "3px solid #8aaa7a" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                        <div style={{ fontSize: 10, color: "#c8ffc8", letterSpacing: 2 }}>CLASSIFIED BLACK BUDGET</div>
+                        <div style={{ fontSize: 18, color: "#4caf50", fontFamily: "Oswald,sans-serif" }}>${blackBudget}B</div>
+                      </div>
+                      <div style={{ fontSize: 8, color: "#5a7a5a", marginBottom: 10 }}>Siphon funds from DoD to fund Shadow Operations. Highly illegal. High risk of Congressional oversight.</div>
+                      <div style={{ display: "flex", gap: 10 }}>
+                        <button className="btn btn-gold" style={{ flex: 1, fontSize: 8 }} onClick={() => {
+                          const totalDod = Object.values(branchBudgets).reduce((a, b) => a + b, 0);
+                          if (totalDod < 50) return notify("DOD BUDGET TOO LOW", "#e84b4b");
+                          const branches = Object.keys(branchBudgets);
+                          const siphonTarget = branches[Math.floor(Math.random() * branches.length)];
+                          setBranchBudgets(b => ({ ...b, [siphonTarget]: Math.max(0, b[siphonTarget] - 5) }));
+                          setBlackBudget(b => b + 5);
+                          updateGeneral({ approval: Math.max(0, (general.approval || 60) - 2) });
+                          notify(`Siphoned $5B from ${siphonTarget.toUpperCase()} to Black Budget (-2 AP)`, "#ffd700");
+                        }}>SIPHON $5B TO BLACK BUDGET</button>
+                      </div>
+                    </div>
                   </div>
                   <div>
                     <div style={{ fontSize: 9, color: "#4b9ae8", letterSpacing: 4, marginBottom: 12 }}>◈ BUDGET IMPACT ASSESSMENT</div>
@@ -1714,6 +1790,116 @@ export default function GeneralHQ() {
               </div>
             )}
 
+            {/* ══ SHADOW OPERATIONS (CONTRACTORS) ══ */}
+            {tab === "shadow" && (
+              <div style={{ animation: "fadeUp 0.3s" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+                  <div style={{ fontSize: 9, color: "#4caf50", letterSpacing: 4 }}>◈ DENIABLE ASSETS & PRIVATE CONTRACTORS</div>
+                  <div style={{ fontSize: 12, color: "#4caf50", fontFamily: "Oswald,sans-serif", padding: "4px 12px", border: "1px solid #4caf50" }}>BLACK BUDGET: ${blackBudget}B</div>
+                </div>
+                {tick < 100 && <div style={{ fontSize: 10, color: "#5a7a5a", fontStyle: "italic", padding: 20 }}>Encrypted channels establishing... Please wait.</div>}
+
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+                  {/* Active Contracts */}
+                  <div className="panel" style={{ padding: 16 }}>
+                    <div style={{ fontSize: 9, color: "#7a9a7a", letterSpacing: 2, marginBottom: 10 }}>ACTIVE SHADOW CONTRACTS</div>
+                    {activeContracts.length === 0 ? <div style={{ fontSize: 8, color: "#4a5a4a", fontStyle: "italic" }}>No active black operations.</div> :
+                      activeContracts.map(c => (
+                        <div key={c.id} style={{ marginBottom: 12, borderBottom: "1px solid #1a2a1a", paddingBottom: 8 }}>
+                          <div style={{ display: "flex", justifyContent: "space-between" }}>
+                            <div style={{ fontSize: 10, color: "#c8ffc8" }}>{c.name}</div>
+                            <div style={{ fontSize: 8, color: c.status === "ACTIVE" ? "#e8b84b" : c.status === "SUCCESS" ? "#4caf50" : "#e84b4b" }}>{c.status}</div>
+                          </div>
+                          <div style={{ fontSize: 8, color: "#5a7a5a", marginTop: 4 }}>{c.contractor}</div>
+                          {c.status === "ACTIVE" && (
+                            <div style={{ height: 2, background: "#0a1a0a", marginTop: 6 }}>
+                              <div style={{ height: "100%", width: `${c.progress}%`, background: "#4caf50", transition: "width 1s linear" }} />
+                            </div>
+                          )}
+                        </div>
+                      ))
+                    }
+                  </div>
+
+                  {/* Available Ops & Weapons Deals */}
+                  <div>
+                    <div style={{ fontSize: 9, color: "#e8b84b", letterSpacing: 2, marginBottom: 10 }}>AVAILABLE BLACK CONTRACTS</div>
+                    {[
+                      { name: "Regime Decapitation", desc: "Aegis Defense will eliminate a hostile dictator deep in Central Africa. Total deniability.", cost: 15, contractor: "Aegis Defense", risk: 0.3, reward: { pr: 15, ap: 5 }, penalty: { pr: 20, ap: 25 } },
+                      { name: "Rogue Arsenal Destruction", desc: "Obsidian Group will sabotage an illegal enrichment facility in Iran.", cost: 25, contractor: "Obsidian Group", risk: 0.4, reward: { pr: 25, ap: 10 }, penalty: { pr: 15, ap: 15 } },
+                      { name: "Prototype Drone Procurement", desc: "Under-the-table deal with Raytheon for 50 unregistered autonomous swarm drones.", cost: 35, contractor: "Raytheon (Black Book)", risk: 0.1, reward: { pr: 10, ap: 0 }, penalty: { pr: 5, ap: 10 } },
+                    ].map((op, i) => (
+                      <div key={i} className="panel" style={{ padding: 12, marginBottom: 8, borderColor: "#2a2a0a" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                          <div style={{ fontSize: 10, color: "#c8b870" }}>{op.name}</div>
+                          <div style={{ fontSize: 10, color: "#4caf50", fontFamily: "Oswald,sans-serif" }}>${op.cost}B</div>
+                        </div>
+                        <div style={{ fontSize: 8, color: "#5a5a3a", marginBottom: 8 }}>{op.desc}</div>
+                        <button className="btn btn-gold" style={{ fontSize: 8, width: "100%", padding: 6 }}
+                          disabled={blackBudget < op.cost || activeContracts.length >= 3}
+                          onClick={() => {
+                            setBlackBudget(b => b - op.cost);
+                            setActiveContracts(prev => [...prev, { id: Date.now(), name: op.name, contractor: op.contractor, progress: 0, status: "ACTIVE", risk: op.risk, reward: op.reward, penalty: op.penalty }]);
+                            notify(`Contract Authorized: ${op.contractor}`, "#ffd700");
+                            updateGeneral({ prestige: Math.min(100, (general.prestige || 60) + 2) });
+                          }}
+                        >
+                          {blackBudget < op.cost ? "INSUFFICIENT BLACK FUNDS" : `AUTHORIZE DIRECT TRANSFER $${op.cost}B`}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ══ SECURE COMMS ══ */}
+            {tab === "comms" && (
+              <div style={{ animation: "fadeUp 0.3s" }}>
+                <div style={{ fontSize: 9, color: "#4b9ae8", letterSpacing: 4, marginBottom: 12 }}>◈ SECURE COMMUNICATIONS TERMINAL</div>
+                <div style={{ display: "grid", gridTemplateColumns: "300px 1fr", gap: 14 }}>
+                  {/* INBOX */}
+                  <div className="panel" style={{ padding: 10, minHeight: 400 }}>
+                    <div style={{ fontSize: 9, color: "#7a9a7a", letterSpacing: 2, marginBottom: 10, paddingLeft: 6 }}>ENCRYPTED INBOX ({inbox.filter(m => !m.read).length})</div>
+                    {inbox.length === 0 ? <div style={{ fontSize: 8, color: "#4a5a4a", fontStyle: "italic", padding: 10 }}>Inbox empty. Waiting for secure handshakes...</div> :
+                      inbox.map(msg => (
+                        <div key={msg.id} style={{ padding: "10px 8px", cursor: "pointer", borderBottom: "1px solid #1a2a1a", background: activeCall?.id === msg.id ? "#1a2a4a" : msg.read ? "transparent" : "#0d1d2d", borderLeft: msg.read ? "none" : "3px solid #4b9ae8" }}
+                          onClick={() => {
+                            setInbox(prev => prev.map(m => m.id === msg.id ? { ...m, read: true } : m));
+                            setActiveCall(msg);
+                          }}
+                        >
+                          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, marginBottom: 4 }}>
+                            <span style={{ color: msg.read ? "#8a9a8a" : "#c8ffc8" }}>{msg.sender}</span>
+                            <span style={{ color: "#5a7a5a" }}>{msg.time}</span>
+                          </div>
+                          <div style={{ fontSize: 8, color: msg.read ? "#5a6a5a" : "#8abbff", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{msg.subject}</div>
+                        </div>
+                      ))
+                    }
+                  </div>
+
+                  {/* MESSAGE BODY */}
+                  <div className="panel" style={{ padding: 20, border: "1px solid #2a3a4a" }}>
+                    {activeCall ? (
+                      <div>
+                        <div style={{ fontSize: 14, color: "#c8ffc8", marginBottom: 6 }}>{activeCall.subject}</div>
+                        <div style={{ fontSize: 9, color: "#4b9ae8", marginBottom: 20, paddingBottom: 10, borderBottom: "1px solid #1a2a3a" }}>FROM: {activeCall.sender} | CLASSIFICATION: TOP SECRET/NOFORN</div>
+                        <div style={{ fontSize: 11, color: "#8a9a8a", lineHeight: 1.8, marginBottom: 40, whiteSpace: "pre-wrap" }}>{activeCall.body}</div>
+
+                        <div style={{ display: "flex", gap: 10 }}>
+                          <button className="btn" style={{ flex: 1, borderColor: "#4caf50", color: "#4caf50" }} onClick={() => { notify(`Reply sent to ${activeCall.sender}. Operations greenlit.`, "#4caf50"); setActiveCall(null); }}>ACKNOWLEDGE & EXECUTE</button>
+                          <button className="btn btn-red" style={{ flex: 1 }} onClick={() => { notify(`Request denied. Message purged.`, "#e84b4b"); setActiveCall(null); setInbox(prev => prev.filter(m => m.id !== activeCall.id)); }}>DENY & PURGE</button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div style={{ height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "#3a4a5a", fontSize: 10, letterSpacing: 2 }}>SELECT A MESSAGE TO DECRYPT</div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
           </div>
 
           {/* FLOATING POTUS BUTTON */}
@@ -1726,6 +1912,7 @@ export default function GeneralHQ() {
               {[
                 { id: "support", label: "EXPRESS FULL SUPPORT", desc: "Reaffirm loyalty", apD: 10, msg: "POTUS nods approvingly. Your loyalty is noted. Trust deepens." },
                 { id: "advise", label: "STRATEGIC COUNSEL", desc: "Present your assessment", apD: 5, msg: "POTUS listens carefully. 'Good thinking, General.' Respect earned." },
+                { id: "secret_service", label: "AUTHORIZE JOINT DOMESTIC OP", desc: "JSOC + Secret Service detail", apD: 15, msg: "POTUS beams. 'Having Delta Force guarding my rally makes me rest easy.' Massive AP gain, but constitutional experts are furious." },
                 { id: "pushback", label: "PUSH BACK", desc: "Challenge an order", apD: -12, msg: "POTUS frowns. 'That's noted, General.' The room goes cold." },
                 { id: "resign_threat", label: "THREATEN RESIGNATION", desc: "Use your position", apD: -25, msg: "POTUS slams the desk. 'Don't test me, General.' Career on thin ice." },
               ].map(m => (
