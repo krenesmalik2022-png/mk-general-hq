@@ -438,6 +438,10 @@ export default function GeneralHQ() {
   const [branchBudgets, setBranchBudgets] = useState({ army: 185, navy: 202, airforce: 216, marines: 53, spaceforce: 30 });
   const [heroRoster, setHeroRoster] = useState([]);
   const [purchases, setPurchases] = useState([]);
+  const [missions, setMissions] = useState([]);
+  const [stateThreats, setStateThreats] = useState([]);
+  const [showPotus, setShowPotus] = useState(false);
+  const tick = useTick(1000);
 
   // Income tick
   useEffect(() => {
@@ -451,16 +455,65 @@ export default function GeneralHQ() {
   useEffect(() => {
     if (!loaded || nuclearWinter) return;
     if (tick > 0 && tick % 25 === 0 && Math.random() > 0.5) {
-      const names = ["Sgt. Miller", "Cpl. Hernandez", "Pvt. Jackson", "Lt. Vance", "SFC. Dubois"];
-      const acts = ["held off an ambush", "rescued a downed pilot", "secured a critical intel cache", "eliminated a high value target", "defended a medical convoy"];
-      const locs = ["Syria", "Somalia", "Yemen", "Afghanistan", "Mali"];
+      const names = ["Sgt. Miller", "Cpl. Hernandez", "Pvt. Jackson", "Lt. Vance", "SFC. Dubois", "SSgt. Park", "Cpl. Adeniji", "PFC. Romero"];
+      const acts = ["held off an ambush", "rescued a downed pilot", "secured a critical intel cache", "eliminated a high value target", "defended a medical convoy", "intercepted enemy comms", "single-handedly captured an outpost", "provided covering fire for evacuation"];
+      const locs = ["Syria", "Somalia", "Yemen", "Afghanistan", "Mali", "Niger", "Ukraine border", "South China Sea"];
       const newHero = { id: Date.now(), name: names[Math.floor(Math.random() * names.length)], action: acts[Math.floor(Math.random() * acts.length)], location: locs[Math.floor(Math.random() * locs.length)], promoted: false };
       setHeroRoster(r => [newHero, ...r].slice(0, 10));
       notify(`Heroic Action: ${newHero.name} ${newHero.action} in ${newHero.location}`, "#ffd700");
     }
   }, [tick, loaded, nuclearWinter]);
 
-  const tick = useTick(1000);
+  // Generate missions periodically
+  useEffect(() => {
+    if (!loaded || nuclearWinter) return;
+    if (tick > 0 && tick % 35 === 0 && missions.length < 8) {
+      const mTypes = [
+        { name: "Operation IRON STORM", desc: "Neutralize insurgent weapons depot in northern Syria", branch: "Army", classification: "SECRET", risk: "HIGH", reward: { prestige: 8, approval: 5 }, penalty: { prestige: -5, approval: -8 } },
+        { name: "Operation DEEP BLUE", desc: "Track and shadow Russian submarine in Norwegian Sea", branch: "Navy", classification: "TOP SECRET/SCI", risk: "CRITICAL", reward: { prestige: 12, approval: 8 }, penalty: { prestige: -10, approval: -15 } },
+        { name: "Operation GHOST HAWK", desc: "Extract CIA asset from hostile territory in Iran", branch: "Air Force", classification: "TOP SECRET", risk: "HIGH", reward: { prestige: 10, approval: 6 }, penalty: { prestige: -8, approval: -12 } },
+        { name: "Operation PACIFIC SHIELD", desc: "Escort Philippine resupply vessels through contested waters", branch: "Marines", classification: "UNCLASSIFIED", risk: "MEDIUM", reward: { prestige: 5, approval: 8 }, penalty: { prestige: -3, approval: -5 } },
+        { name: "Operation STARWATCH", desc: "Deploy classified satellite to monitor DPRK launch sites", branch: "Space Force", classification: "TOP SECRET/SCI", risk: "LOW", reward: { prestige: 6, approval: 3 }, penalty: { prestige: -2, approval: -3 } },
+        { name: "Operation SANDSTORM", desc: "Drone strike on confirmed HVT compound in Yemen", branch: "Air Force", classification: "SECRET", risk: "MEDIUM", reward: { prestige: 7, approval: 4 }, penalty: { prestige: -4, approval: -6 } },
+        { name: "Operation COLD FRONT", desc: "Reinforce NATO Eastern flank with rapid deployment brigade", branch: "Army", classification: "UNCLASSIFIED", risk: "LOW", reward: { prestige: 4, approval: 6 }, penalty: { prestige: -2, approval: -3 } },
+        { name: "Operation TRIDENT FURY", desc: "Carrier strike group live-fire exercise in Indo-Pacific", branch: "Navy", classification: "UNCLASSIFIED", risk: "MEDIUM", reward: { prestige: 6, approval: 5 }, penalty: { prestige: -3, approval: -4 } },
+        { name: "Operation MIDNIGHT SUN", desc: "Covert SIGINT operation against Chinese naval communications", branch: "Navy", classification: "TOP SECRET/SCI", risk: "CRITICAL", reward: { prestige: 15, approval: 10 }, penalty: { prestige: -12, approval: -18 } },
+        { name: "Operation SENTINEL", desc: "Counter-narcotics interdiction in Caribbean Sea", branch: "Marines", classification: "SECRET", risk: "LOW", reward: { prestige: 3, approval: 4 }, penalty: { prestige: -1, approval: -2 } },
+      ];
+      const m = mTypes[Math.floor(Math.random() * mTypes.length)];
+      const newMission = { ...m, id: Date.now(), status: "PENDING", progress: 0 };
+      setMissions(ms => [newMission, ...ms].slice(0, 8));
+      notify(`NEW MISSION: ${m.name}`, m.classification.includes("TOP") ? "#e84b4b" : "#4b9ae8");
+    }
+  }, [tick, loaded, nuclearWinter]);
+
+  // Progress active missions
+  useEffect(() => {
+    if (!loaded || nuclearWinter) return;
+    setMissions(ms => ms.map(m => {
+      if (m.status === "ACTIVE") {
+        const newP = m.progress + (5 + Math.floor(Math.random() * 10));
+        if (newP >= 100) {
+          const success = Math.random() > (m.risk === "CRITICAL" ? 0.4 : m.risk === "HIGH" ? 0.25 : 0.1);
+          if (success) {
+            setTimeout(() => {
+              updateGeneral({ prestige: Math.min(100, (general.prestige || 60) + m.reward.prestige), approval: Math.min(100, (general.approval || 70) + m.reward.approval) });
+              notify(`MISSION SUCCESS: ${m.name}`, "#4caf50");
+            }, 0);
+            return { ...m, status: "SUCCESS", progress: 100 };
+          } else {
+            setTimeout(() => {
+              updateGeneral({ prestige: Math.max(0, (general.prestige || 60) + m.penalty.prestige), approval: Math.max(0, (general.approval || 70) + m.penalty.approval) });
+              notify(`MISSION FAILED: ${m.name}`, "#e84b4b");
+            }, 0);
+            return { ...m, status: "FAILED", progress: 100 };
+          }
+        }
+        return { ...m, progress: newP };
+      }
+      return m;
+    }));
+  }, [tick, loaded, nuclearWinter]);
 
   /* Load/save */
   useEffect(() => {
@@ -819,6 +872,8 @@ export default function GeneralHQ() {
               { id: "politics", label: "🏛 POLITICS" },
               { id: "coup", label: "⚠ COUPS & THREATS" },
               { id: "press", label: "📡 PRESS BRIEFING" },
+              { id: "missions", label: "🎯 MISSIONS" },
+              { id: "threats", label: "🚨 STATE THREATS" },
               { id: "quarters", label: "🥃 GENERAL'S QUARTERS" },
             ].map(t => (
               <button key={t.id} className={`tab-btn${tab === t.id ? " active" : ""}`} onClick={() => setTab(t.id)}>
@@ -1423,7 +1478,269 @@ export default function GeneralHQ() {
                 </div>
               </div>
             )}
+            {/* ══ JOINT STAFF BUDGET ══ */}
+            {tab === "budget" && (
+              <div style={{ animation: "fadeUp 0.3s" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+                  <div>
+                    <div style={{ fontSize: 9, color: "#ffd700", letterSpacing: 4, marginBottom: 12 }}>◈ BRANCH BUDGET ALLOCATIONS (FY2024 IN BILLIONS)</div>
+                    {Object.entries(branchBudgets).map(([branch, amt]) => (
+                      <div key={branch} className="panel" style={{ padding: 16, marginBottom: 8, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <div style={{ fontSize: 12, color: "#c8ffc8", letterSpacing: 2, textTransform: "uppercase" }}>{branch}</div>
+                        <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+                          <button className="btn btn-red" style={{ padding: "4px 10px" }} onClick={() => { if (amt > 10) setBranchBudgets(b => ({ ...b, [branch]: b[branch] - 10 })) }}>-$10B</button>
+                          <div style={{ fontSize: 14, color: "#ffd700", width: 60, textAlign: "center", fontFamily: "Oswald,sans-serif" }}>${amt}B</div>
+                          <button className="btn" style={{ padding: "4px 10px", borderColor: "#4caf50", color: "#4caf50" }} onClick={() => setBranchBudgets(b => ({ ...b, [branch]: b[branch] + 10 }))}>+$10B</button>
+                        </div>
+                      </div>
+                    ))}
+                    <div className="panel-gold" style={{ padding: 16, marginTop: 14 }}>
+                      <div style={{ fontSize: 9, color: "#7a6a3a" }}>TOTAL DOD DISCRETIONARY BUDGET</div>
+                      <div style={{ fontSize: 24, color: "#ffd700", fontFamily: "Oswald,sans-serif" }}>${Object.values(branchBudgets).reduce((a, b) => a + b, 0)} BILLION</div>
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 9, color: "#4b9ae8", letterSpacing: 4, marginBottom: 12 }}>◈ BUDGET IMPACT ASSESSMENT</div>
+                    {[{ label: "NAVY FLEET READINESS", val: branchBudgets.navy, max: 250, color: "#4b9ae8", note: "Carrier strike group deployment capability" }, { label: "AIR FORCE DETERRENCE", val: branchBudgets.airforce, max: 250, color: "#4bcde8", note: "B-21 Raider platform development" }, { label: "ARMY GROUND FORCES", val: branchBudgets.army, max: 250, color: "#4caf50", note: "Brigade combat team readiness" }, { label: "MARINE EXPEDITIONARY", val: branchBudgets.marines, max: 100, color: "#e8b84b", note: "Amphibious assault capability" }, { label: "SPACE FORCE C4ISR", val: branchBudgets.spaceforce, max: 80, color: "#9b59b6", note: "Early warning satellite constellation" }].map(b => (
+                      <div key={b.label} className="panel" style={{ padding: 14, marginBottom: 8 }}>
+                        <div style={{ fontSize: 10, color: "#c8ffc8", marginBottom: 4 }}>{b.label}</div>
+                        <div style={{ height: 4, background: "#0a1a0a", marginBottom: 4 }}><div style={{ height: "100%", width: `${Math.min(100, (b.val / b.max) * 100)}%`, background: b.color, transition: "width 0.5s" }} /></div>
+                        <div style={{ fontSize: 8, color: "#5a7a5a" }}>{b.note}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ══ PERSONNEL COMMAND ══ */}
+            {tab === "personnel" && (
+              <div style={{ animation: "fadeUp 0.3s" }}>
+                <div style={{ fontSize: 9, color: "#4caf50", letterSpacing: 4, marginBottom: 12 }}>◈ ENLISTED HERO ROSTER — FIELD REPORTS</div>
+                {heroRoster.length === 0 && <div style={{ fontSize: 10, color: "#5a7a5a", fontStyle: "italic", padding: 20 }}>No outstanding field citations yet. Heroes will appear as operations progress.</div>}
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+                  {heroRoster.map(hero => (
+                    <div key={hero.id} className="panel" style={{ padding: 16, borderLeft: "3px solid #ffd700" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+                        <div style={{ fontSize: 12, color: "#c8ffc8", letterSpacing: 1 }}>{hero.name}</div>
+                        {hero.promoted && <div style={{ fontSize: 8, color: "#ffd700", border: "1px solid #ffd700", padding: "2px 6px" }}>COMMENDED</div>}
+                      </div>
+                      <div style={{ fontSize: 9, color: "#7a9a7a", marginBottom: 12 }}>
+                        Action: <span style={{ color: "#fff" }}>{hero.action}</span><br />
+                        Location: {hero.location}
+                      </div>
+                      {!hero.promoted && (
+                        <div style={{ display: "flex", gap: 8 }}>
+                          <button className="btn btn-gold" style={{ flex: 1, padding: "6px" }} onClick={() => { setHeroRoster(r => r.map(h => h.id === hero.id ? { ...h, promoted: true } : h)); notify("Medal pinned. Morale increased.", "#ffd700"); updateGeneral({ prestige: Math.min(100, pres + 2) }); }}>PIN MEDAL (+2 PR)</button>
+                          <button className="btn" style={{ flex: 1, padding: "6px", borderColor: "#4b9ae8", color: "#4b9ae8" }} onClick={() => { setHeroRoster(r => r.map(h => h.id === hero.id ? { ...h, promoted: true } : h)); notify("OVAL OFFICE MEETING ARRANGED", "#4b9ae8"); updateGeneral({ prestige: Math.min(100, pres + 8), approval: Math.max(0, ap - 5) }); }}>POTUS MEET (+8 PR, -5 AP)</button>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* ══ MISSIONS BOARD ══ */}
+            {tab === "missions" && (
+              <div style={{ animation: "fadeUp 0.3s" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+                  <div style={{ fontSize: 9, color: "#4b9ae8", letterSpacing: 4 }}>◈ OPERATIONS PLANNING BOARD — {missions.length} MISSIONS</div>
+                  <div style={{ display: "flex", gap: 8, fontSize: 8 }}>
+                    <span style={{ color: "#4caf50" }}>● ACTIVE: {missions.filter(m => m.status === "ACTIVE").length}</span>
+                    <span style={{ color: "#e8b84b" }}>● PENDING: {missions.filter(m => m.status === "PENDING").length}</span>
+                    <span style={{ color: "#4caf50" }}>● SUCCESS: {missions.filter(m => m.status === "SUCCESS").length}</span>
+                    <span style={{ color: "#e84b4b" }}>● FAILED: {missions.filter(m => m.status === "FAILED").length}</span>
+                  </div>
+                </div>
+                {missions.length === 0 && <div style={{ fontSize: 10, color: "#5a7a5a", fontStyle: "italic", padding: 20 }}>No missions available yet. Await intelligence briefings for new operations.</div>}
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                  {missions.map(m => (
+                    <div key={m.id} className="panel" style={{ padding: 16, borderLeft: `3px solid ${m.classification.includes("TOP") ? "#e84b4b" : m.classification === "SECRET" ? "#e8b84b" : "#4caf50"}` }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                        <div style={{ fontSize: 11, color: "#c8ffc8", letterSpacing: 1 }}>{m.name}</div>
+                        <div style={{ fontSize: 7, color: m.classification.includes("TOP") ? "#e84b4b" : "#e8b84b", border: `1px solid ${m.classification.includes("TOP") ? "#e84b4b" : "#e8b84b"}`, padding: "1px 6px", letterSpacing: 1 }}>{m.classification}</div>
+                      </div>
+                      <div style={{ fontSize: 9, color: "#5a7a5a", marginBottom: 8, lineHeight: 1.6 }}>{m.desc}</div>
+                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 8, color: "#3a5a3a", marginBottom: 8 }}>
+                        <span>Branch: {m.branch}</span><span>Risk: <span style={{ color: m.risk === "CRITICAL" ? "#e84b4b" : m.risk === "HIGH" ? "#e8b84b" : "#4caf50" }}>{m.risk}</span></span>
+                      </div>
+                      {m.status === "ACTIVE" && (
+                        <div style={{ marginBottom: 8 }}>
+                          <div style={{ height: 4, background: "#0a1a0a", borderRadius: 2 }}>
+                            <div style={{ height: "100%", width: `${m.progress}%`, background: "linear-gradient(90deg, #2d7a2d, #4caf50)", borderRadius: 2, transition: "width 0.5s" }} />
+                          </div>
+                          <div style={{ fontSize: 7, color: "#4caf50", marginTop: 2 }}>IN PROGRESS — {m.progress}%</div>
+                        </div>
+                      )}
+                      {m.status === "SUCCESS" && <div style={{ fontSize: 9, color: "#4caf50", marginBottom: 6 }}>✓ MISSION ACCOMPLISHED — +{m.reward.prestige} PR, +{m.reward.approval} AP</div>}
+                      {m.status === "FAILED" && <div style={{ fontSize: 9, color: "#e84b4b", marginBottom: 6 }}>✗ MISSION FAILED — {m.penalty.prestige} PR, {m.penalty.approval} AP</div>}
+                      {m.status === "PENDING" && (
+                        <div style={{ display: "flex", gap: 6 }}>
+                          <button className="btn btn-gold" style={{ flex: 1, fontSize: 9 }} onClick={() => setMissions(ms => ms.map(x => x.id === m.id ? { ...x, status: "ACTIVE" } : x))}>⚡ AUTHORIZE</button>
+                          <button className="btn btn-red" style={{ flex: 1, fontSize: 9 }} onClick={() => setMissions(ms => ms.filter(x => x.id !== m.id))}>✗ REJECT</button>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* ══ STATE THREATS ══ */}
+            {tab === "threats" && (
+              <div style={{ animation: "fadeUp 0.3s" }}>
+                <div style={{ fontSize: 9, color: "#e84b4b", letterSpacing: 4, marginBottom: 14 }}>◈ ISSUE STATE THREATS TO ADVERSARIES</div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+                  <div>
+                    <div style={{ fontSize: 9, color: "#7a6a3a", letterSpacing: 2, marginBottom: 10 }}>SELECT TARGET NATION:</div>
+                    {[
+                      { nation: "🇰🇵 North Korea", id: "dprk", risk: "EXTREME" },
+                      { nation: "🇷🇺 Russia", id: "russia", risk: "HIGH" },
+                      { nation: "🇨🇳 China", id: "china", risk: "HIGH" },
+                      { nation: "🇮🇷 Iran", id: "iran", risk: "MEDIUM" },
+                      { nation: "🇻🇪 Venezuela", id: "venezuela", risk: "LOW" },
+                    ].map(t => (
+                      <div key={t.id} className="panel" style={{ padding: 16, marginBottom: 8 }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                          <div style={{ fontSize: 13, color: "#c8ffc8" }}>{t.nation}</div>
+                          <div style={{ fontSize: 8, color: t.risk === "EXTREME" ? "#e84b4b" : t.risk === "HIGH" ? "#e8b84b" : "#4caf50", border: `1px solid`, padding: "2px 8px" }}>{t.risk} RISK</div>
+                        </div>
+                        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                          {[
+                            { label: "DIPLOMATIC WARNING", effect: { ap: 3, pr: 2 }, severity: "low" },
+                            { label: "ECONOMIC SANCTIONS", effect: { ap: 5, pr: 4 }, severity: "med" },
+                            { label: "MILITARY POSTURE", effect: { ap: -5, pr: 8 }, severity: "high" },
+                            { label: "DIRECT THREAT OF FORCE", effect: { ap: -15, pr: 12 }, severity: "extreme" },
+                          ].map(action => {
+                            const issued = stateThreats.find(s => s.nation === t.id && s.action === action.label);
+                            return (
+                              <button key={action.label} className={action.severity === "extreme" ? "btn btn-red" : action.severity === "high" ? "btn btn-gold" : "btn"} style={{ fontSize: 8, padding: "5px 8px", opacity: issued ? 0.5 : 1 }} disabled={!!issued} onClick={() => {
+                                setStateThreats(st => [...st, { nation: t.id, action: action.label, time: Date.now() }]);
+                                updateGeneral({ approval: Math.max(0, Math.min(100, ap + action.effect.ap)), prestige: Math.min(100, pres + action.effect.pr) });
+                                notify(`${action.label} issued to ${t.nation}`, action.severity === "extreme" ? "#e84b4b" : "#ffd700");
+                              }}>
+                                {issued ? "✓ " : ""}{action.label}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 9, color: "#e8b84b", letterSpacing: 2, marginBottom: 10 }}>THREAT LOG:</div>
+                    <div className="panel" style={{ padding: 16, minHeight: 200 }}>
+                      {stateThreats.length === 0 ? (
+                        <div style={{ fontSize: 9, color: "#3a5a3a", fontStyle: "italic", textAlign: "center", marginTop: 60 }}>No state threats have been issued yet.</div>
+                      ) : (
+                        stateThreats.slice().reverse().map((s, i) => (
+                          <div key={i} style={{ padding: "8px 0", borderBottom: "1px solid #0d1a0d", fontSize: 9 }}>
+                            <span style={{ color: "#e84b4b" }}>{s.action}</span>
+                            <span style={{ color: "#3a5a3a" }}> → </span>
+                            <span style={{ color: "#c8ffc8" }}>{s.nation.toUpperCase()}</span>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ══ GENERAL'S QUARTERS ══ */}
+            {tab === "quarters" && (
+              <div style={{ animation: "fadeUp 0.3s" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+                  <div>
+                    <div style={{ fontSize: 9, color: "#e8b84b", letterSpacing: 4, marginBottom: 12 }}>◈ PERSONAL FINANCES & LIFESTYLE</div>
+                    <div className="panel-gold" style={{ padding: 24, textAlign: "center", marginBottom: 14 }}>
+                      <div style={{ fontSize: 10, color: "#7a6a3a", letterSpacing: 2 }}>PERSONAL ACCOUNT</div>
+                      <div style={{ fontSize: 42, color: "#ffd700", fontFamily: "Oswald,sans-serif", letterSpacing: 2, textShadow: "0 0 20px #ffd70066" }}>
+                        ${bankBalance.toLocaleString()}
+                      </div>
+                      <div style={{ fontSize: 8, color: "#5a5a3a", marginTop: 4 }}>Base Salary: $5,000/tick · Hazard Pay Included</div>
+                    </div>
+                    <div style={{ fontSize: 9, color: "#7a6a3a", letterSpacing: 2, marginBottom: 8 }}>PRESTIGE EXPENDITURES:</div>
+                    {[
+                      { item: "Vintage Cuban Cigars", cost: 2000, desc: "For the Situation Room. (+1 PR)", pr: 1, ap: 0 },
+                      { item: "Georgetown Mansion Rent", cost: 15000, desc: "Impress senators at dinner. (+3 PR, +2 AP)", pr: 3, ap: 2 },
+                      { item: "Lobbyist Extravaganza", cost: 45000, desc: "Throw a massive secret gala. (+10 AP)", pr: 0, ap: 10 },
+                      { item: "Custom Pentagon Office", cost: 80000, desc: "Gold-plated everything. (+8 PR)", pr: 8, ap: 0 },
+                      { item: "Private Security Detail", cost: 120000, desc: "Ex-Delta operators. (+5 PR, +5 AP)", pr: 5, ap: 5 },
+                      { item: "Private Cayman Island", cost: 250000, desc: "Ultimate exit strategy. (+25 PR)", pr: 25, ap: 0 },
+                    ].map(p => {
+                      const owned = purchases.includes(p.item);
+                      return (
+                        <div key={p.item} className="choice-card" style={{ marginBottom: 6, borderColor: owned ? "#ffd700" : "#2a2a00" }} onClick={() => {
+                          if (owned) return;
+                          if (bankBalance >= p.cost) {
+                            setBankBalance(b => b - p.cost);
+                            setPurchases(prev => [...prev, p.item]);
+                            notify(`Purchased: ${p.item}`, "#ffd700");
+                            updateGeneral({ prestige: Math.min(100, pres + p.pr), approval: Math.min(100, ap + p.ap) });
+                          } else {
+                            notify("INSUFFICIENT FUNDS", "#e84b4b");
+                          }
+                        }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                            <div>
+                              <div style={{ fontSize: 11, color: owned ? "#ffd700" : "#c8b870", letterSpacing: 1 }}>{p.item}</div>
+                              <div style={{ fontSize: 8, color: "#5a5a3a", marginTop: 2 }}>{p.desc}</div>
+                            </div>
+                            <div style={{ fontSize: 10, color: owned ? "#4caf50" : bankBalance >= p.cost ? "#ffd700" : "#e84b4b", fontFamily: "Oswald,sans-serif" }}>
+                              {owned ? "OWNED" : `$${p.cost.toLocaleString()}`}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 9, color: "#8aaa7a", letterSpacing: 4, marginBottom: 12 }}>◈ QUARTERS INVENTORY</div>
+                    <div className="panel" style={{ padding: 16, border: "1px solid #1a2a1a", minHeight: 200 }}>
+                      {purchases.length === 0 ? (
+                        <div style={{ fontSize: 9, color: "#3a5a3a", fontStyle: "italic", textAlign: "center", marginTop: 60 }}>You live a Spartan life. No luxuries acquired yet.</div>
+                      ) : (
+                        <ul style={{ paddingLeft: 16 }}>
+                          {purchases.map(p => (
+                            <li key={p} style={{ fontSize: 10, color: "#c8ffc8", marginBottom: 8, letterSpacing: 1 }}>{p}</li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
           </div>
+
+          {/* FLOATING POTUS BUTTON */}
+          <button onClick={() => setShowPotus(!showPotus)} style={{ position: "fixed", bottom: 60, right: 20, zIndex: 3500, background: "#1a1400", border: "1px solid #ffd700", color: "#ffd700", fontFamily: "'Share Tech Mono',monospace", fontSize: 10, padding: "10px 16px", cursor: "pointer", letterSpacing: 2, boxShadow: "0 0 12px #ffd70044", animation: "goldGlow 3s infinite" }}>
+            🏛 POTUS MEETING
+          </button>
+          {showPotus && (
+            <div style={{ position: "fixed", bottom: 100, right: 20, zIndex: 3500, width: 320, background: "#0a0a00", border: "1px solid #3a3000", padding: 16 }}>
+              <div style={{ fontSize: 9, color: "#7a6a3a", letterSpacing: 3, marginBottom: 10 }}>REQUEST OVAL OFFICE MEETING:</div>
+              {[
+                { id: "support", label: "EXPRESS FULL SUPPORT", desc: "Reaffirm loyalty", apD: 10, msg: "POTUS nods approvingly. Your loyalty is noted. Trust deepens." },
+                { id: "advise", label: "STRATEGIC COUNSEL", desc: "Present your assessment", apD: 5, msg: "POTUS listens carefully. 'Good thinking, General.' Respect earned." },
+                { id: "pushback", label: "PUSH BACK", desc: "Challenge an order", apD: -12, msg: "POTUS frowns. 'That's noted, General.' The room goes cold." },
+                { id: "resign_threat", label: "THREATEN RESIGNATION", desc: "Use your position", apD: -25, msg: "POTUS slams the desk. 'Don't test me, General.' Career on thin ice." },
+              ].map(m => (
+                <div key={m.id} className="choice-card" style={{ marginBottom: 6, borderColor: "#2a2a00" }} onClick={() => {
+                  updateGeneral({ approval: Math.max(0, Math.min(100, ap + m.apD)), presidentialMeetings: (general.presidentialMeetings || 0) + 1 });
+                  setPresidentialMeet({ msg: m.msg, apD: m.apD });
+                  setShowPotus(false);
+                  notify(m.label + " — Meeting concluded", m.apD > 0 ? "#4caf50" : "#e84b4b");
+                }}>
+                  <div style={{ fontSize: 10, color: "#c8b870", letterSpacing: 1 }}>{m.label}</div>
+                  <div style={{ fontSize: 8, color: "#4a4a3a", marginTop: 2 }}>{m.desc} ({m.apD > 0 ? "+" : ""}{m.apD} AP)</div>
+                </div>
+              ))}
+            </div>
+          )}
 
           {/* BOTTOM STATUS */}
           <div style={{ padding: "8px 20px", borderTop: "1px solid #1a2a1a", display: "flex", gap: 20, alignItems: "center", flexWrap: "wrap", background: "#020904" }}>
