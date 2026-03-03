@@ -1,9 +1,9 @@
-import GeneralHQ from './GeneralHQ'
+import ExtremeCommandCenter from './ExtremeCommandCenter'
 import './App.css'
 
 function App() {
   return (
-    <GeneralHQ />
+    <ExtremeCommandCenter />
   )
 }
 
