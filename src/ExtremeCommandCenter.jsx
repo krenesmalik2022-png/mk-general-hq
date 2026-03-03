@@ -482,23 +482,20 @@ export default function GeneralHQ() {
   useEffect(() => {
     if (!loaded || nuclearWinter) return;
     if (tick > 0 && tick % 40 === 0 && Math.random() > 0.4) {
-      const senders = ["CIA Director", "Gen. Webb", "Adm. Torres", "MI6 Liaison", "Mossad Direct"];
-      const subjects = ["Urgent: Intercepted SIGINT", "Backchannel Request", "Eyes Only: Operation Compromised", "Deniable Assets Required", "Off-the-books Meeting"];
-      const messages = [
-        "We have actionable intel on a high-value target in the Sahel but no footprint. We need JSOC assets, off the books.",
-        "General, there's a leak in the Senate committee. They know about the black budget transfer. Advise.",
-        "My operatives have cornered an arms dealer in Vienna. If we move now, we secure next-gen drone tech, but it's a mess.",
-        "We're seeing unusual activity around the Iranian nuclear sites. Can you authorize a close-pass reconnaissance?",
-        "POTUS is looking weak in the polls. A decisive covert action right now would change the narrative. Do we have something ready?"
+      const commsPool = [
+        { sender: "CIA Director", subject: "Urgent: Intercepted SIGINT", body: "We have actionable intel on a high-value target in the Sahel but no footprint. We need JSOC assets, completely off the books. This cannot touch official channels. Do you authorize?" },
+        { sender: "Gen. Webb", subject: "Backchannel Request — URGENT", body: "General, there's a leak in the Senate Armed Services Committee. They know about the black budget transfer from Q3. My source inside says they plan to subpoena records within 72 hours. We need to move the paper trail — advise immediately." },
+        { sender: "MI6 Liaison", subject: "Eyes Only: Operation VORTEX Compromised", body: "One of your deniable assets in Vienna has been burned by BND. German intelligence photographed the handoff. If this reaches the press, both services take damage. We recommend immediate exfil and a cover story coordinated with State. Awaiting your call." },
+        { sender: "Mossad Direct", subject: "Off-the-books Meeting — Jerusalem", body: "We have a name: Col. Hamid Rashidi. IRGC Quds Force. He's willing to defect but only to you, personally. No CIA involvement. This could be the best human intelligence asset of the decade. Window: 48 hours. Your call." },
+        { sender: "Adm. Torres", subject: "Deniable Assets Required", body: "POTUS is looking weak in the polls ahead of the summit. A decisive covert action right now would change the narrative — we have a target package already prepped for the Sahel. Do we have something ready to go? This stays between us and the NSC principals." },
+        { sender: "NSA SIGINT Relay", subject: "Intercept Package: SENATOR COMMUNICATIONS", body: "NSA routine collection has flagged communications between Senator Harrington (SASC Chairman) and a foreign national via encrypted Signal messages. Content suggests he's been briefed on black budget activities by a Pentagon insider. This requires immediate counter-intelligence action. Classification: TS/SCI/ORCON." },
+        { sender: "Secret Service Director", subject: "POTUS Protection — Joint Ops Request", body: "We have credible HUMINT indicating a domestic threat against POTUS during the Nevada rally. We need JSOC elements — Delta operators — embedded in the security perimeter. This is an unprecedented request but threat level justifies it. Requires your direct authorization. Time-sensitive." },
+        { sender: "Defense Industry Liaison", subject: "Prototype Weapons System — Private Briefing", body: "Lockheed's classified skunkworks division has completed the Mk-IV autonomous hunter-killer prototype. They're offering first-access deployment rights off-ledger for $40B. No GAO oversight, no Congressional notifications. The system would give us a 15-year capability edge. Meeting at your discretion." },
+        { sender: "Gen. Okafor", subject: "CLASSIFIED: Unit Status Report", body: "General, Delta Force operational tempo is at 140% of sustainable levels. My men are running on fumes. We've had three near-misses in the last 30 days on black ops — no casualties yet but the luck won't hold. Request authorization to stand down for 30 days or we risk a strategic compromise. Your call." },
+        { sender: "CIA Director", subject: "ASSET BRAVO-7 Requesting Extraction", body: "Our deep-cover asset inside the Russian SVR — codename BRAVO-7 — has made contact for the first time in 8 months. She's been burned. Requesting immediate exfil from Moscow via a JSOC team. Window: Saturday. Cost: one diplomatic incident minimum. Authorize?" },
       ];
-      const newEmail = {
-        id: Date.now(),
-        sender: senders[Math.floor(Math.random() * senders.length)],
-        subject: subjects[Math.floor(Math.random() * subjects.length)],
-        body: messages[Math.floor(Math.random() * messages.length)],
-        read: false,
-        time: new Date().toLocaleTimeString()
-      };
+      const entry = commsPool[Math.floor(Math.random() * commsPool.length)];
+      const newEmail = { id: Date.now(), ...entry, read: false, time: new Date().toLocaleTimeString() };
       setInbox(prev => [newEmail, ...prev].slice(0, 15));
       notify(`SECURE INBOX: New message from ${newEmail.sender}`, "#e8b84b");
     }
@@ -1735,7 +1732,7 @@ export default function GeneralHQ() {
                       <div style={{ fontSize: 42, color: "#ffd700", fontFamily: "Oswald,sans-serif", letterSpacing: 2, textShadow: "0 0 20px #ffd70066" }}>
                         ${bankBalance.toLocaleString()}
                       </div>
-                      <div style={{ fontSize: 8, color: "#5a5a3a", marginTop: 4 }}>Base Salary: $5,000/tick · Hazard Pay Included</div>
+                      <div style={{ fontSize: 8, color: "#5a5a3a", marginTop: 4 }}>Base Salary: $25,000/tick · POTUS Authorization Clearance</div>
                     </div>
                     <div style={{ fontSize: 9, color: "#7a6a3a", letterSpacing: 2, marginBottom: 8 }}>PRESTIGE EXPENDITURES:</div>
                     {[
@@ -1825,18 +1822,26 @@ export default function GeneralHQ() {
                   <div>
                     <div style={{ fontSize: 9, color: "#e8b84b", letterSpacing: 2, marginBottom: 10 }}>AVAILABLE BLACK CONTRACTS</div>
                     {[
-                      { name: "Regime Decapitation", desc: "Aegis Defense will eliminate a hostile dictator deep in Central Africa. Total deniability.", cost: 15, contractor: "Aegis Defense", risk: 0.3, reward: { pr: 15, ap: 5 }, penalty: { pr: 20, ap: 25 } },
-                      { name: "Rogue Arsenal Destruction", desc: "Obsidian Group will sabotage an illegal enrichment facility in Iran.", cost: 25, contractor: "Obsidian Group", risk: 0.4, reward: { pr: 25, ap: 10 }, penalty: { pr: 15, ap: 15 } },
-                      { name: "Prototype Drone Procurement", desc: "Under-the-table deal with Raytheon for 50 unregistered autonomous swarm drones.", cost: 35, contractor: "Raytheon (Black Book)", risk: 0.1, reward: { pr: 10, ap: 0 }, penalty: { pr: 5, ap: 10 } },
+                      { name: "Regime Decapitation", desc: "Aegis Defense eliminates a hostile African dictator. Total deniability guaranteed.", cost: 15, contractor: "Aegis Defense", risk: 0.3, reward: { pr: 15, ap: 5 }, penalty: { pr: 20, ap: 25 }, tag: "ASSASSINATION" },
+                      { name: "Rogue Arsenal Destruction", desc: "Obsidian Group sabotages an illegal enrichment facility in Iran. No US footprint.", cost: 25, contractor: "Obsidian Group", risk: 0.4, reward: { pr: 25, ap: 10 }, penalty: { pr: 15, ap: 15 }, tag: "SABOTAGE" },
+                      { name: "Prototype Drone Procurement", desc: "Under-the-table deal with Raytheon: 50 unregistered autonomous swarm drones.", cost: 35, contractor: "Raytheon (Black Book)", risk: 0.1, reward: { pr: 10, ap: 0 }, penalty: { pr: 5, ap: 10 }, tag: "WEAPONS DEAL" },
+                      { name: "Whistleblower Suppression", desc: "A journalist has obtained classified budget documents. Iron Falcon will handle the situation discretely.", cost: 20, contractor: "Iron Falcon Solutions", risk: 0.35, reward: { pr: 8, ap: 12 }, penalty: { pr: 5, ap: 30 }, tag: "DOMESTIC" },
+                      { name: "Opposition Research Package", desc: "Scorpion Analytics will compile comprehensive dossiers on political opponents using NSA intercepts.", cost: 18, contractor: "Scorpion Analytics", risk: 0.25, reward: { pr: 5, ap: 10 }, penalty: { pr: 0, ap: 20 }, tag: "INTEL" },
+                      { name: "Senate Committee Soil Operation", desc: "Phantom Strategies will position assets inside the SASC oversight committee to alert us to investigations.", cost: 30, contractor: "Phantom Strategies", risk: 0.2, reward: { pr: 0, ap: 20 }, penalty: { pr: 0, ap: 40 }, tag: "INFILTRATION" },
+                      { name: "Advanced EMP Arsenal", desc: "Greystone Dynamics back-channels a shipment of classified EMP payloads. No Congressional notification.", cost: 50, contractor: "Greystone Dynamics", risk: 0.15, reward: { pr: 20, ap: 0 }, penalty: { pr: 10, ap: 15 }, tag: "WEAPONS DEAL" },
                     ].map((op, i) => (
-                      <div key={i} className="panel" style={{ padding: 12, marginBottom: 8, borderColor: "#2a2a0a" }}>
+                      <div key={i} className="panel" style={{ padding: 12, marginBottom: 8, borderColor: "#2a2a0a", borderLeft: `3px solid ${op.tag === "ASSASSINATION" ? "#e84b4b" : op.tag === "WEAPONS DEAL" ? "#ffd700" : op.tag === "DOMESTIC" ? "#9b59b6" : "#4b9ae8"}` }}>
                         <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
                           <div style={{ fontSize: 10, color: "#c8b870" }}>{op.name}</div>
-                          <div style={{ fontSize: 10, color: "#4caf50", fontFamily: "Oswald,sans-serif" }}>${op.cost}B</div>
+                          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                            <div style={{ fontSize: 7, color: op.tag === "ASSASSINATION" ? "#e84b4b" : op.tag === "WEAPONS DEAL" ? "#ffd700" : op.tag === "DOMESTIC" ? "#9b59b6" : "#4b9ae8", border: "1px solid", padding: "1px 5px", borderColor: op.tag === "ASSASSINATION" ? "#e84b4b" : op.tag === "WEAPONS DEAL" ? "#ffd700" : op.tag === "DOMESTIC" ? "#9b59b6" : "#4b9ae8" }}>{op.tag}</div>
+                            <div style={{ fontSize: 10, color: "#4caf50", fontFamily: "Oswald,sans-serif" }}>${op.cost}B</div>
+                          </div>
                         </div>
-                        <div style={{ fontSize: 8, color: "#5a5a3a", marginBottom: 8 }}>{op.desc}</div>
+                        <div style={{ fontSize: 8, color: "#5a5a3a", marginBottom: 4 }}>{op.desc}</div>
+                        <div style={{ fontSize: 7, color: "#4a5a4a", marginBottom: 8 }}>Via: {op.contractor} · Risk: <span style={{ color: op.risk > 0.3 ? "#e84b4b" : "#e8b84b" }}>{Math.round(op.risk * 100)}% intercept probability</span></div>
                         <button className="btn btn-gold" style={{ fontSize: 8, width: "100%", padding: 6 }}
-                          disabled={blackBudget < op.cost || activeContracts.length >= 3}
+                          disabled={blackBudget < op.cost || activeContracts.length >= 5}
                           onClick={() => {
                             setBlackBudget(b => b - op.cost);
                             setActiveContracts(prev => [...prev, { id: Date.now(), name: op.name, contractor: op.contractor, progress: 0, status: "ACTIVE", risk: op.risk, reward: op.reward, penalty: op.penalty }]);
@@ -1887,9 +1892,10 @@ export default function GeneralHQ() {
                         <div style={{ fontSize: 9, color: "#4b9ae8", marginBottom: 20, paddingBottom: 10, borderBottom: "1px solid #1a2a3a" }}>FROM: {activeCall.sender} | CLASSIFICATION: TOP SECRET/NOFORN</div>
                         <div style={{ fontSize: 11, color: "#8a9a8a", lineHeight: 1.8, marginBottom: 40, whiteSpace: "pre-wrap" }}>{activeCall.body}</div>
 
-                        <div style={{ display: "flex", gap: 10 }}>
-                          <button className="btn" style={{ flex: 1, borderColor: "#4caf50", color: "#4caf50" }} onClick={() => { notify(`Reply sent to ${activeCall.sender}. Operations greenlit.`, "#4caf50"); setActiveCall(null); }}>ACKNOWLEDGE & EXECUTE</button>
-                          <button className="btn btn-red" style={{ flex: 1 }} onClick={() => { notify(`Request denied. Message purged.`, "#e84b4b"); setActiveCall(null); setInbox(prev => prev.filter(m => m.id !== activeCall.id)); }}>DENY & PURGE</button>
+                        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                          <button className="btn" style={{ flex: 1, borderColor: "#4caf50", color: "#4caf50", minWidth: 160 }} onClick={() => { updateGeneral({ prestige: Math.min(100, (general.prestige || 60) + 3), approval: Math.min(100, (general.approval || 70) + 2) }); notify(`Greenlit. ${activeCall.sender} acknowledged. +3 PR, +2 AP`, "#4caf50"); setActiveCall(null); }}>⚡ GREENLIGHT (+3 PR, +2 AP)</button>
+                          <button className="btn btn-gold" style={{ flex: 1, minWidth: 160 }} onClick={() => { notify(`Forwarded to backchannel. Deniability maintained.`, "#e8b84b"); setActiveCall(null); }}>↗ REROUTE TO BACKCHANNEL</button>
+                          <button className="btn btn-red" style={{ flex: 1, minWidth: 160 }} onClick={() => { updateGeneral({ approval: Math.min(100, (general.approval || 70) + 1) }); notify(`Request denied. Message purged from system.`, "#e84b4b"); setActiveCall(null); setInbox(prev => prev.filter(m => m.id !== activeCall.id)); }}>🗑 DENY & PURGE (+1 AP)</button>
                         </div>
                       </div>
                     ) : (
