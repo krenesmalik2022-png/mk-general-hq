@@ -2311,15 +2311,48 @@ export default function GeneralHQ() {
                   </div>
                   <div>
                     <div style={{ fontSize: 9, color: "#8aaa7a", letterSpacing: 4, marginBottom: 12 }}>◈ QUARTERS INVENTORY</div>
-                    <div className="panel" style={{ padding: 16, border: "1px solid #1a2a1a", minHeight: 200 }}>
+                    <div className="panel" style={{ padding: 16, border: "1px solid #1a2a1a", minHeight: 120, marginBottom: 14 }}>
                       {purchases.length === 0 ? (
-                        <div style={{ fontSize: 9, color: "#3a5a3a", fontStyle: "italic", textAlign: "center", marginTop: 60 }}>You live a Spartan life. No luxuries acquired yet.</div>
+                        <div style={{ fontSize: 9, color: "#3a5a3a", fontStyle: "italic", textAlign: "center", marginTop: 20 }}>You live a Spartan life. No luxuries acquired yet.</div>
                       ) : (
-                        <ul style={{ paddingLeft: 16 }}>
+                        <ul style={{ paddingLeft: 16, margin: 0 }}>
                           {purchases.map(p => (
                             <li key={p} style={{ fontSize: 10, color: "#c8ffc8", marginBottom: 8, letterSpacing: 1 }}>{p}</li>
                           ))}
                         </ul>
+                      )}
+                    </div>
+
+                    <div style={{ fontSize: 9, color: "#4b9ae8", letterSpacing: 4, marginBottom: 12 }}>◈ PRIVATE MILITARY HOLDINGS</div>
+                    <div className="panel" style={{ padding: 16, border: "1px solid #1a2a4a", background: "#050a15" }}>
+                      {!general.ownsPMC ? (
+                        <div style={{ textAlign: "center", padding: 10 }}>
+                          <div style={{ fontSize: 11, color: "#4b9ae8", marginBottom: 8 }}>ESTABLISH SHELL PMC ($50,000)</div>
+                          <div style={{ fontSize: 8, color: "#5a7a9a", marginBottom: 16, lineHeight: 1.5 }}>Use personal funds to establish a Private Military Company via shell corporations in Cyprus. This allows you to bid on US defense contracts and earn massive black budget profits.</div>
+                          <button className="btn" style={{ borderColor: "#4b9ae8", color: "#4b9ae8", width: "100%" }} onClick={() => {
+                            if (bankBalance >= 50000) {
+                              setBankBalance(b => b - 50000);
+                              updateGeneral({ ownsPMC: true });
+                              notify("SHADOW PMC ESTABLISHED: AEGIS SOLUTIONS", "#4b9ae8");
+                            } else {
+                              notify("INSUFFICIENT PERSONAL FUNDS", "#e84b4b");
+                            }
+                          }}>AUTHORIZE WIRE TRANSFER</button>
+                        </div>
+                      ) : (
+                        <div>
+                          <div style={{ fontSize: 14, color: "#c8ffc8", letterSpacing: 2, marginBottom: 4 }}>{general.pmcStats.name.toUpperCase()}</div>
+                          <div style={{ fontSize: 8, color: "#5a7a9a", marginBottom: 16 }}>OFFSHORE HOLDING COMPANY · DoD CLEARANCE L-V</div>
+                          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+                            <span style={{ fontSize: 9, color: "#7a9a7a" }}>PMC REPUTATION</span>
+                            <span style={{ fontSize: 10, color: "#4caf50" }}>{general.pmcStats.rep}/100</span>
+                          </div>
+                          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 16 }}>
+                            <span style={{ fontSize: 9, color: "#7a9a7a" }}>OFFSHORE ACCOUNTS</span>
+                            <span style={{ fontSize: 12, color: "#ffd700", fontFamily: "Oswald,sans-serif" }}>${(general.pmcStats.funds || 0).toLocaleString()}</span>
+                          </div>
+                          <div style={{ fontSize: 8, color: "#4a5a4a", fontStyle: "italic", textAlign: "center" }}>Go to SHADOW OPS to bid on DoD contracts with your PMC.</div>
+                        </div>
                       )}
                     </div>
                   </div>
