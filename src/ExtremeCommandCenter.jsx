@@ -465,13 +465,34 @@ function Corners({ color = "#ffd700" }) {
 
 /* ═══════════════════════════ NEWS TICKER ════════════════════════════════════ */
 function NewsTicker({ items }) {
+  if (!items || items.length === 0) return null;
   return (
-    <div style={{ background: "#0a0a00", borderTop: "1px solid #3a3000", borderBottom: "1px solid #3a3000", padding: "6px 0", overflow: "hidden", position: "relative" }}>
+    <div style={{ background: "#050000", borderTop: "2px solid #3a0000", borderBottom: "2px solid #3a0000", padding: "8px 0", overflow: "hidden", position: "relative", boxShadow: "0 0 20px #ff000022 inset" }}>
       <div style={{ display: "flex", alignItems: "center" }}>
-        <div style={{ background: "#e84b4b", color: "#fff", fontSize: 8, letterSpacing: 3, padding: "2px 10px", flexShrink: 0, marginRight: 12, fontFamily: "monospace" }}>LIVE</div>
-        <div style={{ overflow: "hidden", flex: 1 }}>
-          <div style={{ whiteSpace: "nowrap", animation: "ticker 60s linear infinite", fontSize: 9, color: "#a08000", letterSpacing: 1 }}>
-            {items.join("   ◆   ")}   ◆   {items.join("   ◆   ")}
+        <div style={{ background: "#e84b4b", color: "#fff", fontSize: 10, fontWeight: "bold", letterSpacing: 4, padding: "4px 14px", flexShrink: 0, marginRight: 16, fontFamily: "'Oswald', sans-serif", zIndex: 2, boxShadow: "4px 0 10px #000" }}>LIVE INTELLIGENCE</div>
+        <div style={{ overflow: "hidden", flex: 1, position: "relative" }}>
+          <div style={{ whiteSpace: "nowrap", animation: "ticker 45s linear infinite", fontSize: 11, color: "#e8b84b", letterSpacing: 2, fontFamily: "'Share Tech Mono', monospace", textShadow: "0 0 5px #e8b84b88" }}>
+            {items.map((item, idx) => (
+              <span key={idx}>
+                {item.includes("BREAKING") || item.includes("CRISIS") || item.includes("EXPIRED") ? (
+                  <span style={{ color: "#e84b4b", fontWeight: "bold", animation: "pulseRed 2s infinite" }}>{item}</span>
+                ) : (
+                  <span>{item}</span>
+                )}
+                <span style={{ color: "#5a5a3a", margin: "0 30px" }}>◈</span>
+              </span>
+            ))}
+            {/* Duplicate for seamless scrolling */}
+            {items.map((item, idx) => (
+              <span key={"dup-" + idx}>
+                {item.includes("BREAKING") || item.includes("CRISIS") || item.includes("EXPIRED") ? (
+                  <span style={{ color: "#e84b4b", fontWeight: "bold", animation: "pulseRed 2s infinite" }}>{item}</span>
+                ) : (
+                  <span>{item}</span>
+                )}
+                <span style={{ color: "#5a5a3a", margin: "0 30px" }}>◈</span>
+              </span>
+            ))}
           </div>
         </div>
       </div>
@@ -844,6 +865,25 @@ function NuclearLaunch({ defcon, onClose, onLaunch }) {
   );
 }
 
+/* ═══════════════════════════ LIVE TERMINAL WIDGET ═══════════════════════════ */
+function LiveTerminal({ logs }) {
+  return (
+    <div className="panel" style={{ marginTop: 20, padding: 0, overflow: "hidden", display: "flex", flexDirection: "column", height: 200, border: "1px solid #1a2a1a" }}>
+      <div style={{ background: "#0a1a0a", padding: "4px 12px", borderBottom: "1px solid #1a3a1a", fontSize: 9, color: "#4caf50", letterSpacing: 2 }}>
+        ◈ SECURE OP-CENTER FEED
+      </div>
+      <div style={{ flex: 1, padding: 12, overflowY: "auto", display: "flex", flexDirection: "column-reverse", gap: 6 }}>
+        {logs.map((log) => (
+          <div key={log.id} style={{ fontSize: 10, fontFamily: "Share Tech Mono, monospace", color: log.type === "error" ? "#e84b4b" : log.type === "success" ? "#4caf50" : "#a8b8a8", display: "flex", gap: 8, animation: "fadeUp 0.3s" }}>
+            <span style={{ color: "#3a5a3a" }}>[{log.timestamp}]</span>
+            <span style={{ textShadow: log.type === "error" ? "0 0 5px #e84b4bea" : log.type === "success" ? "0 0 5px #4caf50ea" : "none" }}>{log.text}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 /* ═══════════════════════════ MAIN APP ═══════════════════════════════════════ */
 export default function GeneralHQ() {
   const [loaded, setLoaded] = useState(false);
@@ -855,6 +895,7 @@ export default function GeneralHQ() {
     hotZones: HOT_ZONES, deployments: [], eventLog: [],
     awardedTo: {}, coupStatus: "none", presidentialMeetings: 0,
     ownsPMC: false, pmcStats: { name: "Aegis Default", rep: 0, funds: 0 },
+    globalStats: { casualties: 0, econDamageTrillions: 0, panicIndex: 10, unStanding: 60 },
     personnelRoster: [
       { id: "p1", name: "Sgt. 1st Class Miller", rank: "E-7", unit: "Delta Force", status: "ACTIVE" },
       { id: "p2", name: "Staff Sgt. Hernandez", rank: "E-6", unit: "75th Rangers", status: "ACTIVE" },
@@ -888,6 +929,7 @@ export default function GeneralHQ() {
   const [activeCall, setActiveCall] = useState(null);
   const [activeContracts, setActiveContracts] = useState([]);
   const [liveMissions, setLiveMissions] = useState([]);
+  const [liveTerminalLog, setLiveTerminalLog] = useState([{ id: 1, text: "SYS // USSOCOM SECURE TERMINAL INITIALIZED...", type: "system", timestamp: new Date().toLocaleTimeString() }]);
   const [completedMissions, setCompletedMissions] = useState([]);
   const [econStatus, setEconStatus] = useState({ gdp: 0, unemployment: 0, marketIndex: 100 });
   const [activeLiveMission, setActiveLiveMission] = useState(null);
@@ -973,22 +1015,43 @@ export default function GeneralHQ() {
       if (m.resolved || m.timeLeft === null) return m;
       const newTime = m.timeLeft - 1;
       if (newTime <= 0) {
-        // Mission expired — apply economic consequences
+        // Mission expired — apply massive global consequences
         const econDmg = m.econImpact;
         setEconStatus(e => ({
           gdp: +(e.gdp + econDmg.gdpChange).toFixed(1),
           unemployment: +(e.unemployment + econDmg.unemploymentChange).toFixed(1),
           marketIndex: +(e.marketIndex + econDmg.gdpChange * 8).toFixed(1),
         }));
-        updateGeneral({ prestige: Math.max(0, (general.prestige || 60) - 12), approval: Math.max(0, (general.approval || 70) - 10) });
-        notify(`MISSION EXPIRED: ${m.title} — ${econDmg.label} — ECONOMIC DAMAGE APPLIED`, "#e84b4b");
+
+        let cas = Math.floor(Math.random() * 50000) + 10000;
+        let pnc = 25;
+        let dmg = Math.abs(econDmg.gdpChange) * 2;
+
+        updateGeneral({
+          prestige: Math.max(0, (general.prestige || 60) - 15),
+          approval: Math.max(0, (general.approval || 70) - 20),
+          globalStats: {
+            ...general.globalStats,
+            casualties: (general.globalStats?.casualties || 0) + cas,
+            econDamageTrillions: +((general.globalStats?.econDamageTrillions || 0) + dmg).toFixed(2),
+            panicIndex: Math.min(100, (general.globalStats?.panicIndex || 0) + pnc),
+            unStanding: Math.max(0, (general.globalStats?.unStanding || 50) - 15)
+          }
+        });
+
+        setNewsTicker(t => [`BREAKING: CRISIS MISHANDLED — ${m.title} Results in Catastrophe!`, `MARKETS PLUMMET: ${econDmg.label}`, `EST. CASUALTIES: ${cas.toLocaleString()}`, ...t].slice(0, 15));
+
+        notify(`MISSION EXPIRED: ${m.title} — ${econDmg.label} — CASUALTIES: ${cas.toLocaleString()}`, "#e84b4b");
         setCompletedMissions(c => [{ ...m, result: "EXPIRED", completedAt: new Date().toLocaleTimeString() }, ...c]);
+
+        setLiveTerminalLog(l => [{ id: Date.now(), text: `SYS // CRITICAL FAILURE: ${m.title} window closed. Escalating to POTUS.`, type: "error", timestamp: new Date().toLocaleTimeString() }, ...l].slice(0, 30));
+
         if (activeLiveMission?.id === m.id) setActiveLiveMission(null);
         return { ...m, resolved: true, result: "EXPIRED", timeLeft: 0 };
       }
       return { ...m, timeLeft: newTime };
     }));
-  }, [tick, loaded, nuclearWinter]);
+  }, [tick, loaded, nuclearWinter, general]);
 
 
   useEffect(() => {
@@ -1160,13 +1223,48 @@ export default function GeneralHQ() {
   };
 
   const resolveMission = (mission, option, officerId = null) => {
+    // Determine dynamic casualties and panic based on risk profile and text
+    let cas = 0;
+    let pnc = 0;
+    let dmg = 0;
+    let outText = option.outcome.toLowerCase();
+
+    if (option.risk === "WAR" || option.risk === "EXTREME") {
+      cas = Math.floor(Math.random() * 5000) + 500;
+      pnc = Math.floor(Math.random() * 10) + 5;
+      dmg = Number((Math.random() * 0.5).toFixed(2));
+    } else if (option.risk === "HIGH") {
+      cas = Math.floor(Math.random() * 500) + 50;
+      pnc = Math.floor(Math.random() * 5) + 2;
+    }
+
+    if (outText.includes("die") || outText.includes("casualty") || outText.includes("wounded")) cas += Math.floor(Math.random() * 100) + 20;
+    if (outText.includes("crash") || outText.includes("drop")) dmg += Number((Math.random() * 0.2).toFixed(2));
+
+    const isDisaster = option.effect.approval < 0 || option.effect.prestige < 0;
+
     // 1. Apply Option Effects
     updateGeneral({
       approval: Math.min(100, Math.max(0, (general.approval || 70) + option.effect.approval)),
       prestige: Math.min(100, Math.max(0, (general.prestige || 60) + option.effect.prestige)),
-      defcon: Math.min(5, Math.max(1, (general.defcon || 4) + option.effect.defcon))
+      defcon: Math.min(5, Math.max(1, (general.defcon || 4) + option.effect.defcon)),
+      globalStats: {
+        ...general.globalStats,
+        casualties: (general.globalStats?.casualties || 0) + cas,
+        econDamageTrillions: +((general.globalStats?.econDamageTrillions || 0) + dmg).toFixed(2),
+        panicIndex: Math.min(100, Math.max(0, (general.globalStats?.panicIndex || 10) + pnc)),
+        unStanding: Math.min(100, Math.max(0, (general.globalStats?.unStanding || 50) + (isDisaster ? -10 : 2)))
+      }
     });
     setBankBalance(b => b + option.effect.bankChange);
+
+    // News Ticker Push
+    const newsHeadline = isDisaster ? `CRISIS UPDATE: ${mission.title} Execution Criticized` : `BREAKING: ${mission.title} Successfully Resolved`;
+    setNewsTicker(t => [newsHeadline, option.outcome.substring(0, 80) + "...", ...t].slice(0, 15));
+
+    // Terminal Push
+    const termMsg = `OP COMPLETE // ${mission.title} [${option.label}] -> Risk: ${option.risk}. CASUALTIES: ${cas}`;
+    setLiveTerminalLog(l => [{ id: Date.now(), text: termMsg, type: isDisaster ? "error" : "success", timestamp: new Date().toLocaleTimeString() }, ...l].slice(0, 30));
 
     // 2. Grant Officer XP if assigned
     let officerMsg = "";
@@ -1177,13 +1275,16 @@ export default function GeneralHQ() {
         return o;
       }));
       const officer = officerRoster.find(o => o.id === officerId);
-      if (officer) officerMsg = ` — ${officer.rank} ${officer.name} gained ${xpGain} XP for commanding.`;
+      if (officer) {
+        officerMsg = ` — ${officer.rank} ${officer.name} gained ${xpGain} XP for commanding.`;
+        setLiveTerminalLog(l => [{ id: Date.now() + 1, text: `PERSONNEL // ${officer.rank} ${officer.name} reports mission accomplished. XP +${xpGain}`, type: "system", timestamp: new Date().toLocaleTimeString() }, ...l].slice(0, 30));
+      }
     }
 
     setLiveMissions(prev => prev.filter(m => m.id !== mission.id));
-    setCompletedMissions(prev => [{ ...mission, result: "SUCCESS", chosenOption: option.label, completedAt: new Date().toLocaleTimeString() }, ...prev]);
+    setCompletedMissions(prev => [{ ...mission, result: isDisaster ? "MIXED" : "SUCCESS", chosenOption: option.label, casualties: cas, completedAt: new Date().toLocaleTimeString() }, ...prev]);
     setActiveLiveMission(null);
-    notify(`MISSION SUCCESS: ${mission.title} RESOLVED${officerMsg}`, "#4caf50");
+    notify(`MISSION RESOLVED: ${mission.title} ${officerMsg}`, isDisaster ? "#e8b84b" : "#4caf50");
   };
 
   function deployUnit(unit, zone) {
@@ -1321,13 +1422,13 @@ export default function GeneralHQ() {
         {/* INCOMING EVENT MODAL */}
         {activeEvent && !eventResult && (
           <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.96)", zIndex: 3000, display: "flex", alignItems: "center", justifyContent: "center", overflow: "auto" }}>
-            <div className="panel-gold" style={{ maxWidth: 620, width: "95%", padding: 28, border: `2px solid ${activeEvent.type === "NUCLEAR" ? "#e84b4b" : activeEvent.type === "COUP" ? "#9b59b6" : "#3a3000"}`, animation: "fadeUp 0.4s" }}>
+            <div className={`panel-gold ${activeEvent.urgency === "CRITICAL" ? "shake-intense" : ""}`} style={{ maxWidth: 620, width: "95%", padding: 28, border: `2px solid ${activeEvent.type === "NUCLEAR" ? "#e84b4b" : activeEvent.type === "COUP" ? "#9b59b6" : "#3a3000"}`, animation: activeEvent.urgency === "CRITICAL" ? "none" : "fadeUp 0.4s" }}>
               <Corners color={activeEvent.type === "NUCLEAR" ? "#e84b4b" : "#ffd700"} />
               <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 8 }}>
                 <div style={{ fontSize: 8, background: activeEvent.urgency === "CRITICAL" ? "#1a0000" : "#1a1000", border: `1px solid ${activeEvent.urgency === "CRITICAL" ? "#e84b4b" : "#e8b84b"}`, color: activeEvent.urgency === "CRITICAL" ? "#e84b4b" : "#e8b84b", padding: "2px 8px", letterSpacing: 3 }}>{activeEvent.urgency}</div>
                 <div style={{ fontSize: 8, color: "#5a5a3a", letterSpacing: 2 }}>{activeEvent.type}</div>
               </div>
-              <div className="glow-gold" style={{ fontFamily: "Oswald,sans-serif", fontSize: 16, letterSpacing: 4, marginBottom: 16 }}>{activeEvent.title}</div>
+              <div className={`glow-gold ${activeEvent.type === "NUCLEAR" ? "glitch-text" : ""}`} data-text={activeEvent.title} style={{ fontFamily: "Oswald,sans-serif", fontSize: 16, letterSpacing: 4, marginBottom: 16 }}>{activeEvent.title}</div>
               <div style={{ background: "#050a05", border: "1px solid #1a2a1a", padding: 16, marginBottom: 20 }}>
                 <div style={{ fontSize: 9, color: "#e8b84b", letterSpacing: 3, marginBottom: 8 }}>◈ INCOMING INTELLIGENCE</div>
                 <div style={{ fontSize: 11, color: "#8aaa7a", lineHeight: 2 }}>
@@ -1475,6 +1576,32 @@ export default function GeneralHQ() {
                   <div style={{ fontSize: 7, color: "#4b9ae8" }}>{prestigeLabel(pres)}</div>
                 </div>
                 <div style={{ width: 1, height: 40, background: "#2a2a00" }} />
+
+                {/* NEW GLOBAL STATS */}
+                <div style={{ textAlign: "center", minWidth: 60 }}>
+                  <div className={general.globalStats?.casualties > 0 ? "glow-red" : ""} style={{ fontSize: 16, color: general.globalStats?.casualties > 0 ? "#e84b4b" : "#5a5a3a", fontFamily: "Oswald,sans-serif" }}>
+                    {general.globalStats?.casualties > 0 ? (general.globalStats.casualties).toLocaleString() : "0"}
+                  </div>
+                  <div style={{ fontSize: 7, color: "#5a5a3a", letterSpacing: 1 }}>CASUALTIES</div>
+                </div>
+                <div style={{ width: 1, height: 40, background: "#2a2a00" }} />
+
+                <div style={{ textAlign: "center", minWidth: 60 }}>
+                  <div className={general.globalStats?.econDamageTrillions > 0 ? "glow-red" : ""} style={{ fontSize: 16, color: general.globalStats?.econDamageTrillions > 0 ? "#e84b4b" : "#5a5a3a", fontFamily: "Oswald,sans-serif" }}>
+                    {general.globalStats?.econDamageTrillions > 0 ? `-$${general.globalStats.econDamageTrillions}T` : "$0"}
+                  </div>
+                  <div style={{ fontSize: 7, color: "#5a5a3a", letterSpacing: 1 }}>ECON DAMAGE</div>
+                </div>
+                <div style={{ width: 1, height: 40, background: "#2a2a00" }} />
+
+                <div style={{ textAlign: "center", minWidth: 50 }}>
+                  <div className={general.globalStats?.panicIndex > 50 ? "glow-red" : ""} style={{ fontSize: 16, color: general.globalStats?.panicIndex > 50 ? "#e84b4b" : "#e8b84b", fontFamily: "Oswald,sans-serif" }}>
+                    {general.globalStats?.panicIndex || 0}%
+                  </div>
+                  <div style={{ fontSize: 7, color: "#5a5a3a", letterSpacing: 1 }}>GLOBAL PANIC</div>
+                </div>
+                <div style={{ width: 1, height: 40, background: "#2a2a00" }} />
+
                 {/* Nuclear button */}
                 <button className="btn btn-red" style={{ padding: "8px 14px", fontSize: 10, letterSpacing: 2, animation: def <= 2 ? "redPulse 1.5s infinite" : undefined }} onClick={() => setShowNuclear(true)}>
                   ☢ NUCLEAR
@@ -2592,749 +2719,599 @@ export default function GeneralHQ() {
               );
             })()}
 
-
-            <div className="panel" style={{ padding: 12, textAlign: "center", borderLeft: `3px solid ${econStatus.unemployment > 0 ? "#e87a4b" : "#4caf50"}` }}>
-              <div style={{ fontSize: 22, color: econStatus.unemployment > 0 ? "#e87a4b" : "#4caf50", fontFamily: "Oswald,sans-serif" }}>+{econStatus.unemployment.toFixed(1)}%</div>
-              <div style={{ fontSize: 8, color: "#3a5a3a", letterSpacing: 2 }}>UNEMPLOYMENT Δ</div>
-            </div>
-            <div className="panel" style={{ padding: 12, textAlign: "center", borderLeft: `3px solid ${econStatus.marketIndex < 100 ? "#e84b4b" : "#4caf50"}` }}>
-              <div style={{ fontSize: 22, color: econStatus.marketIndex < 100 ? "#e84b4b" : "#4caf50", fontFamily: "Oswald,sans-serif" }}>{econStatus.marketIndex.toFixed(0)}</div>
-              <div style={{ fontSize: 8, color: "#3a5a3a", letterSpacing: 2 }}>MARKET INDEX</div>
-            </div>
-          </div>
-
-          <div style={{ display: "grid", gridTemplateColumns: "280px 1fr", gap: 14 }}>
-            {/* LEFT — MISSION LIST */}
-            <div>
-              <div style={{ fontSize: 9, color: "#e84b4b", letterSpacing: 3, marginBottom: 10 }}>ACTIVE CRISES ({active.length})</div>
-              {active.length === 0 && (
-                <div style={{ background: "#050d05", border: "1px solid #1a3a1a", padding: 20, textAlign: "center" }}>
-                  <div style={{ fontSize: 24, color: "#4caf50", marginBottom: 6 }}>✓</div>
-                  <div style={{ fontSize: 9, color: "#4caf50", letterSpacing: 2, marginBottom: 4 }}>ALL CRISES RESOLVED</div>
-                  <div style={{ fontSize: 8, color: "#3a5a3a" }}>New crises emerge automatically as simulation progresses. Stay vigilant.</div>
-                </div>
-              )}
-              {active.map(m => {
-                const pct = (m.timeLeft / m.timerSeconds) * 100;
-                const isSelected = focused?.id === m.id;
-                const timeColor = pct > 50 ? "#4caf50" : pct > 25 ? "#e8b84b" : "#e84b4b";
-                return (
-                  <div key={m.id} onClick={() => setActiveLiveMission(m)}
-                    style={{ cursor: "pointer", background: isSelected ? "#0d1a0d" : "#050d05", border: `1px solid ${isSelected ? "#4caf50" : "#1a2a1a"}`, borderLeft: `3px solid ${timeColor}`, padding: "12px 14px", marginBottom: 8, transition: "all 0.2s" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-                      <div style={{ fontSize: 9, color: "#c8ffc8", letterSpacing: 1 }}>{m.title.replace("OPERATION ", "OP. ")}</div>
-                      <div style={{ fontSize: 14, fontFamily: "Oswald,sans-serif", color: timeColor, minWidth: 36, textAlign: "right" }}>{m.timeLeft}s</div>
-                    </div>
-                    <div style={{ fontSize: 7, color: "#5a7a5a", marginBottom: 6 }}>{m.theater} · {m.classification}</div>
-                    <div style={{ height: 2, background: "#0a1a0a" }}>
-                      <div style={{ height: "100%", width: `${pct}%`, background: timeColor, transition: "width 1s linear" }} />
-                    </div>
-                    <div style={{ fontSize: 7, color: m.econImpact.severity === "EXTINCTION" ? "#e84b4b" : "#e87a4b", marginTop: 4 }}>{m.econImpact.label}</div>
-                  </div>
-                );
-              })}
-
-              {/* RESOLVED LOG */}
-              {resolved.length > 0 && (
-                <div style={{ marginTop: 16 }}>
-                  <div style={{ fontSize: 9, color: "#3a5a3a", letterSpacing: 2, marginBottom: 8 }}>RESOLVED ({completedMissions.length})</div>
-                  {resolved.map((m, i) => (
-                    <div key={i} style={{ padding: "8px 10px", borderLeft: `2px solid ${m.result === "EXPIRED" ? "#e84b4b" : "#4caf50"}`, background: "#040c04", marginBottom: 6 }}>
-                      <div style={{ fontSize: 8, color: m.result === "EXPIRED" ? "#e84b4b" : "#4caf50" }}>{m.result === "EXPIRED" ? "✗ EXPIRED" : "✓ RESOLVED"}</div>
-                      <div style={{ fontSize: 8, color: "#7a9a7a" }}>{m.title.replace("OPERATION ", "OP. ")}</div>
-                      {m.chosenOption && <div style={{ fontSize: 7, color: "#3a5a3a" }}>{m.chosenOption}</div>}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* RIGHT — MISSION DETAIL */}
-            {focused ? (
-              <div>
-                {/* Urgency / Title */}
-                <div style={{ background: "#080000", border: "1px solid #3a1a1a", padding: "8px 16px", display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+            {/* ══ STATE THREATS ══ */}
+            {tab === "threats" && (
+              <div style={{ animation: "fadeUp 0.3s" }}>
+                <div style={{ fontSize: 9, color: "#e84b4b", letterSpacing: 4, marginBottom: 14 }}>◈ ISSUE STATE THREATS TO ADVERSARIES</div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
                   <div>
-                    <div style={{ fontSize: 8, color: "#e84b4b", letterSpacing: 3 }}>⚡ {focused.urgency} — {focused.classification}</div>
-                    <div style={{ fontSize: 16, color: "#c8ffc8", fontFamily: "Oswald,sans-serif", letterSpacing: 3, marginTop: 2 }}>{focused.title}</div>
-                  </div>
-                  <div style={{ textAlign: "center" }}>
-                    <div style={{ fontSize: 44, fontFamily: "Oswald,sans-serif", color: (focused.timeLeft / focused.timerSeconds) > 0.25 ? "#e8b84b" : "#e84b4b", lineHeight: 1, animation: focused.timeLeft < 30 ? "pulse 0.5s infinite" : undefined }}>{focused.timeLeft}</div>
-                    <div style={{ fontSize: 7, color: "#5a3a3a", letterSpacing: 2 }}>SECONDS REMAINING</div>
-                  </div>
-                </div>
-
-                {/* Economic Consequence Warning */}
-                <div style={{ background: "#0a0500", border: "1px solid #3a1a00", padding: "8px 16px", marginBottom: 12 }}>
-                  <div style={{ fontSize: 8, color: focused.econImpact.severity === "EXTINCTION" ? "#e84b4b" : "#e87a4b", letterSpacing: 2, marginBottom: 2 }}>
-                    ⚠ ECONOMIC CONSEQUENCE (IF MISSION EXPIRES):
-                  </div>
-                  <div style={{ fontSize: 11, color: "#e87a4b" }}>{focused.econImpact.label}</div>
-                  <div style={{ fontSize: 8, color: "#5a3a3a" }}>GDP: {focused.econImpact.gdpChange}% · Unemployment: +{focused.econImpact.unemploymentChange}% · Severity: <span style={{ color: focused.econImpact.severity === "EXTINCTION" ? "#e84b4b" : "#e87a4b" }}>{focused.econImpact.severity}</span></div>
-                </div>
-
-                {/* Situation Brief */}
-                <div className="panel" style={{ padding: 16, marginBottom: 14 }}>
-                  <div style={{ fontSize: 8, color: "#4b9ae8", letterSpacing: 3, marginBottom: 8 }}>SITUATION BRIEF · {focused.theater.toUpperCase()}</div>
-                  <div style={{ fontSize: 10, color: "#8aaa7a", lineHeight: 1.9 }}>{focused.situation}</div>
-                </div>
-
-                {/* Action Options */}
-                <div style={{ fontSize: 9, color: "#e8b84b", letterSpacing: 3, marginBottom: 10 }}>SELECT COURSE OF ACTION:</div>
-
-                {/* Assignment dropdown for Live Missions */}
-                <div style={{ marginBottom: 16, background: "#050a05", padding: "10px 14px", border: "1px solid #1a2a1a" }}>
-                  <div style={{ fontSize: 8, color: "#c8b870", letterSpacing: 2, marginBottom: 8 }}>ASSIGN COMMANDING OFFICER (OPTIONAL)</div>
-                  <select
-                    id="officer-select-mission"
-                    className="fikra-input"
-                    style={{ width: "100%", padding: "8px", fontSize: 10, background: "#000", border: "1px solid #2a3a2a", color: "#c8ffc8", outline: "none" }}
-                  >
-                    <option value="">NO OFFICER ASSIGNED (GENERAL DIRECT COMMAND)</option>
-                    {officerRoster.filter(o => o.status === "ACTIVE").map(o => (
-                      <option key={o.id} value={o.id}>{o.rank} {o.name.toUpperCase()} — {o.unit} ({o.specialty})</option>
+                    <div style={{ fontSize: 9, color: "#7a6a3a", letterSpacing: 2, marginBottom: 10 }}>SELECT TARGET NATION:</div>
+                    {[
+                      { nation: "🇰🇵 North Korea", id: "dprk", risk: "EXTREME" },
+                      { nation: "🇷🇺 Russia", id: "russia", risk: "HIGH" },
+                      { nation: "🇨🇳 China", id: "china", risk: "HIGH" },
+                      { nation: "🇮🇷 Iran", id: "iran", risk: "MEDIUM" },
+                      { nation: "🇻🇪 Venezuela", id: "venezuela", risk: "LOW" },
+                    ].map(t => (
+                      <div key={t.id} className="panel" style={{ padding: 16, marginBottom: 8 }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                          <div style={{ fontSize: 13, color: "#c8ffc8" }}>{t.nation}</div>
+                          <div style={{ fontSize: 8, color: t.risk === "EXTREME" ? "#e84b4b" : t.risk === "HIGH" ? "#e8b84b" : "#4caf50", border: `1px solid`, padding: "2px 8px" }}>{t.risk} RISK</div>
+                        </div>
+                        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                          {[
+                            { label: "DIPLOMATIC WARNING", effect: { ap: 3, pr: 2 }, severity: "low" },
+                            { label: "ECONOMIC SANCTIONS", effect: { ap: 5, pr: 4 }, severity: "med" },
+                            { label: "MILITARY POSTURE", effect: { ap: -5, pr: 8 }, severity: "high" },
+                            { label: "DIRECT THREAT OF FORCE", effect: { ap: -15, pr: 12 }, severity: "extreme" },
+                          ].map(action => {
+                            const issued = stateThreats.find(s => s.nation === t.id && s.action === action.label);
+                            return (
+                              <button key={action.label} className={action.severity === "extreme" ? "btn btn-red" : action.severity === "high" ? "btn btn-gold" : "btn"} style={{ fontSize: 8, padding: "5px 8px", opacity: issued ? 0.5 : 1 }} disabled={!!issued} onClick={() => {
+                                setStateThreats(st => [...st, { nation: t.id, action: action.label, time: Date.now() }]);
+                                updateGeneral({ approval: Math.max(0, Math.min(100, ap + action.effect.ap)), prestige: Math.min(100, pres + action.effect.pr) });
+                                notify(`${action.label} issued to ${t.nation}`, action.severity === "extreme" ? "#e84b4b" : "#ffd700");
+                              }}>
+                                {issued ? "✓ " : ""}{action.label}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
                     ))}
-                  </select>
-                  <div style={{ fontSize: 7, color: "#5a7a5a", marginTop: 6 }}>Assigning an officer grants them Combat Experience (XP) upon successful mission resolution, allowing for future promotion.</div>
-                </div>
-
-                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                  {focused.options.map((opt, i) => (
-                    <div key={i} onClick={() => {
-                      const officerId = document.getElementById("officer-select-mission")?.value || null;
-                      resolveMission(focused, opt, officerId);
-                    }}
-                      style={{ cursor: "pointer", background: "#050d05", border: `1px solid ${opt.color}22`, borderLeft: `3px solid ${opt.color}`, padding: 16, transition: "all 0.2s" }}
-                      onMouseEnter={e => { e.currentTarget.style.background = "#0a1a0a"; e.currentTarget.style.borderColor = opt.color + "66"; }}
-                      onMouseLeave={e => { e.currentTarget.style.background = "#050d05"; e.currentTarget.style.borderColor = opt.color + "22"; }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 6 }}>
-                        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-                          <div style={{ fontSize: 20 }}>{opt.icon}</div>
-                          <div>
-                            <div style={{ fontSize: 11, color: opt.color, letterSpacing: 2 }}>{opt.label}</div>
-                            <div style={{ fontSize: 8, color: "#5a7a5a", marginTop: 2 }}>RISK LEVEL: <span style={{ color: opt.risk === "WAR" || opt.risk === "EXTREME" ? "#e84b4b" : opt.risk === "HIGH" ? "#e87a4b" : "#4caf50" }}>{opt.risk}</span></div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 9, color: "#e8b84b", letterSpacing: 2, marginBottom: 10 }}>THREAT LOG:</div>
+                    <div className="panel" style={{ padding: 16, minHeight: 200 }}>
+                      {stateThreats.length === 0 ? (
+                        <div style={{ fontSize: 9, color: "#3a5a3a", fontStyle: "italic", textAlign: "center", marginTop: 60 }}>No state threats have been issued yet.</div>
+                      ) : (
+                        stateThreats.slice().reverse().map((s, i) => (
+                          <div key={i} style={{ padding: "8px 0", borderBottom: "1px solid #0d1a0d", fontSize: 9 }}>
+                            <span style={{ color: "#e84b4b" }}>{s.action}</span>
+                            <span style={{ color: "#3a5a3a" }}> → </span>
+                            <span style={{ color: "#c8ffc8" }}>{s.nation.toUpperCase()}</span>
                           </div>
-                        </div>
-                        <div style={{ display: "flex", gap: 8, fontSize: 8 }}>
-                          {opt.effect.approval !== 0 && <div style={{ color: opt.effect.approval > 0 ? "#4caf50" : "#e84b4b" }}>AP {opt.effect.approval > 0 ? "+" : ""}{opt.effect.approval}</div>}
-                          {opt.effect.prestige !== 0 && <div style={{ color: opt.effect.prestige > 0 ? "#4b9ae8" : "#e84b4b" }}>PR {opt.effect.prestige > 0 ? "+" : ""}{opt.effect.prestige}</div>}
-                          {opt.effect.defcon !== 0 && <div style={{ color: "#e8b84b" }}>DEFCON {opt.effect.defcon < 0 ? "↑" : "↓"}</div>}
-                          {opt.effect.bankChange > 0 && <div style={{ color: "#ffd700" }}>+${(opt.effect.bankChange / 1000).toFixed(0)}K</div>}
-                        </div>
-                      </div>
-                      <div style={{ fontSize: 9, color: "#5a7a5a", lineHeight: 1.7, fontStyle: "italic" }}>"{opt.outcome.slice(0, 140)}..."</div>
-                      <div style={{ marginTop: 8, textAlign: "right" }}>
-                        <div style={{ display: "inline-block", fontSize: 8, color: opt.color, border: `1px solid ${opt.color}`, padding: "3px 14px", letterSpacing: 2 }}>► EXECUTE ORDER</div>
-                      </div>
+                        ))
+                      )}
                     </div>
-                  ))}
-                </div>
-              </div>
-            ) : (
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: 350, border: "1px solid #1a3a1a", background: "#020c02" }}>
-                <div style={{ textAlign: "center", color: "#2a4a2a" }}>
-                  <div style={{ fontSize: 40, marginBottom: 10, opacity: 0.5 }}>◈</div>
-                  <div style={{ fontSize: 10, letterSpacing: 4 }}>SITUATION ROOM STANDBY</div>
-                  <div style={{ fontSize: 8, marginTop: 6, color: "#1a3a1a" }}>Select a crisis from the queue</div>
+                  </div>
                 </div>
               </div>
             )}
-          </div>
-        </div>
-        );
-    })()}
 
-        {/* ══ STATE THREATS ══ */}
-        {tab === "threats" && (
-          <div style={{ animation: "fadeUp 0.3s" }}>
-            <div style={{ fontSize: 9, color: "#e84b4b", letterSpacing: 4, marginBottom: 14 }}>◈ ISSUE STATE THREATS TO ADVERSARIES</div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-              <div>
-                <div style={{ fontSize: 9, color: "#7a6a3a", letterSpacing: 2, marginBottom: 10 }}>SELECT TARGET NATION:</div>
-                {[
-                  { nation: "🇰🇵 North Korea", id: "dprk", risk: "EXTREME" },
-                  { nation: "🇷🇺 Russia", id: "russia", risk: "HIGH" },
-                  { nation: "🇨🇳 China", id: "china", risk: "HIGH" },
-                  { nation: "🇮🇷 Iran", id: "iran", risk: "MEDIUM" },
-                  { nation: "🇻🇪 Venezuela", id: "venezuela", risk: "LOW" },
-                ].map(t => (
-                  <div key={t.id} className="panel" style={{ padding: 16, marginBottom: 8 }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-                      <div style={{ fontSize: 13, color: "#c8ffc8" }}>{t.nation}</div>
-                      <div style={{ fontSize: 8, color: t.risk === "EXTREME" ? "#e84b4b" : t.risk === "HIGH" ? "#e8b84b" : "#4caf50", border: `1px solid`, padding: "2px 8px" }}>{t.risk} RISK</div>
-                    </div>
-                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                      {[
-                        { label: "DIPLOMATIC WARNING", effect: { ap: 3, pr: 2 }, severity: "low" },
-                        { label: "ECONOMIC SANCTIONS", effect: { ap: 5, pr: 4 }, severity: "med" },
-                        { label: "MILITARY POSTURE", effect: { ap: -5, pr: 8 }, severity: "high" },
-                        { label: "DIRECT THREAT OF FORCE", effect: { ap: -15, pr: 12 }, severity: "extreme" },
-                      ].map(action => {
-                        const issued = stateThreats.find(s => s.nation === t.id && s.action === action.label);
-                        return (
-                          <button key={action.label} className={action.severity === "extreme" ? "btn btn-red" : action.severity === "high" ? "btn btn-gold" : "btn"} style={{ fontSize: 8, padding: "5px 8px", opacity: issued ? 0.5 : 1 }} disabled={!!issued} onClick={() => {
-                            setStateThreats(st => [...st, { nation: t.id, action: action.label, time: Date.now() }]);
-                            updateGeneral({ approval: Math.max(0, Math.min(100, ap + action.effect.ap)), prestige: Math.min(100, pres + action.effect.pr) });
-                            notify(`${action.label} issued to ${t.nation}`, action.severity === "extreme" ? "#e84b4b" : "#ffd700");
-                          }}>
-                            {issued ? "✓ " : ""}{action.label}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <div>
-                <div style={{ fontSize: 9, color: "#e8b84b", letterSpacing: 2, marginBottom: 10 }}>THREAT LOG:</div>
-                <div className="panel" style={{ padding: 16, minHeight: 200 }}>
-                  {stateThreats.length === 0 ? (
-                    <div style={{ fontSize: 9, color: "#3a5a3a", fontStyle: "italic", textAlign: "center", marginTop: 60 }}>No state threats have been issued yet.</div>
-                  ) : (
-                    stateThreats.slice().reverse().map((s, i) => (
-                      <div key={i} style={{ padding: "8px 0", borderBottom: "1px solid #0d1a0d", fontSize: 9 }}>
-                        <span style={{ color: "#e84b4b" }}>{s.action}</span>
-                        <span style={{ color: "#3a5a3a" }}> → </span>
-                        <span style={{ color: "#c8ffc8" }}>{s.nation.toUpperCase()}</span>
+            {/* ══ GENERAL'S QUARTERS ══ */}
+            {tab === "quarters" && (
+              <div style={{ animation: "fadeUp 0.3s" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+                  <div>
+                    <div style={{ fontSize: 9, color: "#e8b84b", letterSpacing: 4, marginBottom: 12 }}>◈ PERSONAL FINANCES & LIFESTYLE</div>
+                    <div className="panel-gold" style={{ padding: 24, textAlign: "center", marginBottom: 14 }}>
+                      <div style={{ fontSize: 10, color: "#7a6a3a", letterSpacing: 2 }}>PERSONAL ACCOUNT</div>
+                      <div style={{ fontSize: 42, color: "#ffd700", fontFamily: "Oswald,sans-serif", letterSpacing: 2, textShadow: "0 0 20px #ffd70066" }}>
+                        ${bankBalance.toLocaleString()}
                       </div>
-                    ))
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ══ GENERAL'S QUARTERS ══ */}
-        {tab === "quarters" && (
-          <div style={{ animation: "fadeUp 0.3s" }}>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-              <div>
-                <div style={{ fontSize: 9, color: "#e8b84b", letterSpacing: 4, marginBottom: 12 }}>◈ PERSONAL FINANCES & LIFESTYLE</div>
-                <div className="panel-gold" style={{ padding: 24, textAlign: "center", marginBottom: 14 }}>
-                  <div style={{ fontSize: 10, color: "#7a6a3a", letterSpacing: 2 }}>PERSONAL ACCOUNT</div>
-                  <div style={{ fontSize: 42, color: "#ffd700", fontFamily: "Oswald,sans-serif", letterSpacing: 2, textShadow: "0 0 20px #ffd70066" }}>
-                    ${bankBalance.toLocaleString()}
+                      <div style={{ fontSize: 8, color: "#5a5a3a", marginTop: 4 }}>Base Salary: $25,000/tick · POTUS Authorization Clearance</div>
+                    </div>
+                    <div style={{ fontSize: 9, color: "#7a6a3a", letterSpacing: 2, marginBottom: 8 }}>PRESTIGE EXPENDITURES:</div>
+                    {[
+                      { item: "Vintage Cuban Cigars", cost: 2000, desc: "For the Situation Room. (+1 PR)", pr: 1, ap: 0 },
+                      { item: "Georgetown Mansion Rent", cost: 15000, desc: "Impress senators at dinner. (+3 PR, +2 AP)", pr: 3, ap: 2 },
+                      { item: "Lobbyist Extravaganza", cost: 45000, desc: "Throw a massive secret gala. (+10 AP)", pr: 0, ap: 10 },
+                      { item: "Custom Pentagon Office", cost: 80000, desc: "Gold-plated everything. (+8 PR)", pr: 8, ap: 0 },
+                      { item: "Private Security Detail", cost: 120000, desc: "Ex-Delta operators. (+5 PR, +5 AP)", pr: 5, ap: 5 },
+                      { item: "Private Cayman Island", cost: 250000, desc: "Ultimate exit strategy. (+25 PR)", pr: 25, ap: 0 },
+                    ].map(p => {
+                      const owned = purchases.includes(p.item);
+                      return (
+                        <div key={p.item} className="choice-card" style={{ marginBottom: 6, borderColor: owned ? "#ffd700" : "#2a2a00" }} onClick={() => {
+                          if (owned) return;
+                          if (bankBalance >= p.cost) {
+                            setBankBalance(b => b - p.cost);
+                            setPurchases(prev => [...prev, p.item]);
+                            notify(`Purchased: ${p.item}`, "#ffd700");
+                            updateGeneral({ prestige: Math.min(100, pres + p.pr), approval: Math.min(100, ap + p.ap) });
+                          } else {
+                            notify("INSUFFICIENT FUNDS", "#e84b4b");
+                          }
+                        }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                            <div>
+                              <div style={{ fontSize: 11, color: owned ? "#ffd700" : "#c8b870", letterSpacing: 1 }}>{p.item}</div>
+                              <div style={{ fontSize: 8, color: "#5a5a3a", marginTop: 2 }}>{p.desc}</div>
+                            </div>
+                            <div style={{ fontSize: 10, color: owned ? "#4caf50" : bankBalance >= p.cost ? "#ffd700" : "#e84b4b", fontFamily: "Oswald,sans-serif" }}>
+                              {owned ? "OWNED" : `$${p.cost.toLocaleString()}`}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
-                  <div style={{ fontSize: 8, color: "#5a5a3a", marginTop: 4 }}>Base Salary: $25,000/tick · POTUS Authorization Clearance</div>
-                </div>
-                <div style={{ fontSize: 9, color: "#7a6a3a", letterSpacing: 2, marginBottom: 8 }}>PRESTIGE EXPENDITURES:</div>
-                {[
-                  { item: "Vintage Cuban Cigars", cost: 2000, desc: "For the Situation Room. (+1 PR)", pr: 1, ap: 0 },
-                  { item: "Georgetown Mansion Rent", cost: 15000, desc: "Impress senators at dinner. (+3 PR, +2 AP)", pr: 3, ap: 2 },
-                  { item: "Lobbyist Extravaganza", cost: 45000, desc: "Throw a massive secret gala. (+10 AP)", pr: 0, ap: 10 },
-                  { item: "Custom Pentagon Office", cost: 80000, desc: "Gold-plated everything. (+8 PR)", pr: 8, ap: 0 },
-                  { item: "Private Security Detail", cost: 120000, desc: "Ex-Delta operators. (+5 PR, +5 AP)", pr: 5, ap: 5 },
-                  { item: "Private Cayman Island", cost: 250000, desc: "Ultimate exit strategy. (+25 PR)", pr: 25, ap: 0 },
-                ].map(p => {
-                  const owned = purchases.includes(p.item);
-                  return (
-                    <div key={p.item} className="choice-card" style={{ marginBottom: 6, borderColor: owned ? "#ffd700" : "#2a2a00" }} onClick={() => {
-                      if (owned) return;
-                      if (bankBalance >= p.cost) {
-                        setBankBalance(b => b - p.cost);
-                        setPurchases(prev => [...prev, p.item]);
-                        notify(`Purchased: ${p.item}`, "#ffd700");
-                        updateGeneral({ prestige: Math.min(100, pres + p.pr), approval: Math.min(100, ap + p.ap) });
-                      } else {
-                        notify("INSUFFICIENT FUNDS", "#e84b4b");
-                      }
-                    }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <div>
+                    <div style={{ fontSize: 9, color: "#8aaa7a", letterSpacing: 4, marginBottom: 12 }}>◈ QUARTERS INVENTORY</div>
+                    <div className="panel" style={{ padding: 16, border: "1px solid #1a2a1a", minHeight: 120, marginBottom: 14 }}>
+                      {purchases.length === 0 ? (
+                        <div style={{ fontSize: 9, color: "#3a5a3a", fontStyle: "italic", textAlign: "center", marginTop: 20 }}>You live a Spartan life. No luxuries acquired yet.</div>
+                      ) : (
+                        <ul style={{ paddingLeft: 16, margin: 0 }}>
+                          {purchases.map(p => (
+                            <li key={p} style={{ fontSize: 10, color: "#c8ffc8", marginBottom: 8, letterSpacing: 1 }}>{p}</li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+
+                    <div style={{ fontSize: 9, color: "#4b9ae8", letterSpacing: 4, marginBottom: 12 }}>◈ PRIVATE MILITARY HOLDINGS</div>
+                    <div className="panel" style={{ padding: 16, border: "1px solid #1a2a4a", background: "#050a15" }}>
+                      {!general.ownsPMC ? (
+                        <div style={{ textAlign: "center", padding: 10 }}>
+                          <div style={{ fontSize: 11, color: "#4b9ae8", marginBottom: 8 }}>ESTABLISH SHELL PMC ($50,000)</div>
+                          <div style={{ fontSize: 8, color: "#5a7a9a", marginBottom: 16, lineHeight: 1.5 }}>Use personal funds to establish a Private Military Company via shell corporations in Cyprus. This allows you to bid on US defense contracts and earn massive black budget profits.</div>
+                          <button className="btn" style={{ borderColor: "#4b9ae8", color: "#4b9ae8", width: "100%" }} onClick={() => {
+                            if (bankBalance >= 50000) {
+                              setBankBalance(b => b - 50000);
+                              updateGeneral({ ownsPMC: true });
+                              notify("SHADOW PMC ESTABLISHED: AEGIS SOLUTIONS", "#4b9ae8");
+                            } else {
+                              notify("INSUFFICIENT PERSONAL FUNDS", "#e84b4b");
+                            }
+                          }}>AUTHORIZE WIRE TRANSFER</button>
+                        </div>
+                      ) : (
                         <div>
-                          <div style={{ fontSize: 11, color: owned ? "#ffd700" : "#c8b870", letterSpacing: 1 }}>{p.item}</div>
-                          <div style={{ fontSize: 8, color: "#5a5a3a", marginTop: 2 }}>{p.desc}</div>
-                        </div>
-                        <div style={{ fontSize: 10, color: owned ? "#4caf50" : bankBalance >= p.cost ? "#ffd700" : "#e84b4b", fontFamily: "Oswald,sans-serif" }}>
-                          {owned ? "OWNED" : `$${p.cost.toLocaleString()}`}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-              <div>
-                <div style={{ fontSize: 9, color: "#8aaa7a", letterSpacing: 4, marginBottom: 12 }}>◈ QUARTERS INVENTORY</div>
-                <div className="panel" style={{ padding: 16, border: "1px solid #1a2a1a", minHeight: 120, marginBottom: 14 }}>
-                  {purchases.length === 0 ? (
-                    <div style={{ fontSize: 9, color: "#3a5a3a", fontStyle: "italic", textAlign: "center", marginTop: 20 }}>You live a Spartan life. No luxuries acquired yet.</div>
-                  ) : (
-                    <ul style={{ paddingLeft: 16, margin: 0 }}>
-                      {purchases.map(p => (
-                        <li key={p} style={{ fontSize: 10, color: "#c8ffc8", marginBottom: 8, letterSpacing: 1 }}>{p}</li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-
-                <div style={{ fontSize: 9, color: "#4b9ae8", letterSpacing: 4, marginBottom: 12 }}>◈ PRIVATE MILITARY HOLDINGS</div>
-                <div className="panel" style={{ padding: 16, border: "1px solid #1a2a4a", background: "#050a15" }}>
-                  {!general.ownsPMC ? (
-                    <div style={{ textAlign: "center", padding: 10 }}>
-                      <div style={{ fontSize: 11, color: "#4b9ae8", marginBottom: 8 }}>ESTABLISH SHELL PMC ($50,000)</div>
-                      <div style={{ fontSize: 8, color: "#5a7a9a", marginBottom: 16, lineHeight: 1.5 }}>Use personal funds to establish a Private Military Company via shell corporations in Cyprus. This allows you to bid on US defense contracts and earn massive black budget profits.</div>
-                      <button className="btn" style={{ borderColor: "#4b9ae8", color: "#4b9ae8", width: "100%" }} onClick={() => {
-                        if (bankBalance >= 50000) {
-                          setBankBalance(b => b - 50000);
-                          updateGeneral({ ownsPMC: true });
-                          notify("SHADOW PMC ESTABLISHED: AEGIS SOLUTIONS", "#4b9ae8");
-                        } else {
-                          notify("INSUFFICIENT PERSONAL FUNDS", "#e84b4b");
-                        }
-                      }}>AUTHORIZE WIRE TRANSFER</button>
-                    </div>
-                  ) : (
-                    <div>
-                      <div style={{ fontSize: 14, color: "#c8ffc8", letterSpacing: 2, marginBottom: 4 }}>{general.pmcStats.name.toUpperCase()}</div>
-                      <div style={{ fontSize: 8, color: "#5a7a9a", marginBottom: 16 }}>OFFSHORE HOLDING COMPANY · DoD CLEARANCE L-V</div>
-                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-                        <span style={{ fontSize: 9, color: "#7a9a7a" }}>PMC REPUTATION</span>
-                        <span style={{ fontSize: 10, color: "#4caf50" }}>{general.pmcStats.rep}/100</span>
-                      </div>
-                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 16 }}>
-                        <span style={{ fontSize: 9, color: "#7a9a7a" }}>OFFSHORE ACCOUNTS</span>
-                        <span style={{ fontSize: 12, color: "#ffd700", fontFamily: "Oswald,sans-serif" }}>${(general.pmcStats.funds || 0).toLocaleString()}</span>
-                      </div>
-                      <div style={{ fontSize: 8, color: "#4a5a4a", fontStyle: "italic", textAlign: "center" }}>Go to SHADOW OPS to bid on DoD contracts with your PMC.</div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ══ SHADOW OPERATIONS (CONTRACTORS) ══ */}
-        {tab === "shadow" && (
-          <div style={{ animation: "fadeUp 0.3s" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-              <div style={{ fontSize: 9, color: "#4caf50", letterSpacing: 4 }}>◈ DENIABLE ASSETS & PRIVATE CONTRACTORS</div>
-              <div style={{ fontSize: 12, color: "#4caf50", fontFamily: "Oswald,sans-serif", padding: "4px 12px", border: "1px solid #4caf50" }}>BLACK BUDGET: ${blackBudget}B</div>
-            </div>
-            {tick < 100 && <div style={{ fontSize: 10, color: "#5a7a5a", fontStyle: "italic", padding: 20 }}>Encrypted channels establishing... Please wait.</div>}
-
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-              {/* Active Contracts */}
-              <div className="panel" style={{ padding: 16 }}>
-                <div style={{ fontSize: 9, color: "#7a9a7a", letterSpacing: 2, marginBottom: 10 }}>ACTIVE SHADOW CONTRACTS</div>
-                {activeContracts.length === 0 ? <div style={{ fontSize: 8, color: "#4a5a4a", fontStyle: "italic" }}>No active black operations.</div> :
-                  activeContracts.map(c => (
-                    <div key={c.id} style={{ marginBottom: 12, borderBottom: "1px solid #1a2a1a", paddingBottom: 8 }}>
-                      <div style={{ display: "flex", justifyContent: "space-between" }}>
-                        <div style={{ fontSize: 10, color: "#c8ffc8" }}>{c.name}</div>
-                        <div style={{ fontSize: 8, color: c.status === "ACTIVE" ? "#e8b84b" : c.status === "SUCCESS" ? "#4caf50" : "#e84b4b" }}>{c.status}</div>
-                      </div>
-                      <div style={{ fontSize: 8, color: "#5a7a5a", marginTop: 4 }}>{c.contractor}</div>
-                      {c.status === "ACTIVE" && (
-                        <div style={{ height: 2, background: "#0a1a0a", marginTop: 6 }}>
-                          <div style={{ height: "100%", width: `${c.progress}%`, background: "#4caf50", transition: "width 1s linear" }} />
+                          <div style={{ fontSize: 14, color: "#c8ffc8", letterSpacing: 2, marginBottom: 4 }}>{general.pmcStats.name.toUpperCase()}</div>
+                          <div style={{ fontSize: 8, color: "#5a7a9a", marginBottom: 16 }}>OFFSHORE HOLDING COMPANY · DoD CLEARANCE L-V</div>
+                          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+                            <span style={{ fontSize: 9, color: "#7a9a7a" }}>PMC REPUTATION</span>
+                            <span style={{ fontSize: 10, color: "#4caf50" }}>{general.pmcStats.rep}/100</span>
+                          </div>
+                          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 16 }}>
+                            <span style={{ fontSize: 9, color: "#7a9a7a" }}>OFFSHORE ACCOUNTS</span>
+                            <span style={{ fontSize: 12, color: "#ffd700", fontFamily: "Oswald,sans-serif" }}>${(general.pmcStats.funds || 0).toLocaleString()}</span>
+                          </div>
+                          <div style={{ fontSize: 8, color: "#4a5a4a", fontStyle: "italic", textAlign: "center" }}>Go to SHADOW OPS to bid on DoD contracts with your PMC.</div>
                         </div>
                       )}
                     </div>
-                  ))
-                }
-              </div>
-
-              {/* Available Ops & Weapons Deals */}
-              <div>
-                <div style={{ fontSize: 9, color: "#e8b84b", letterSpacing: 2, marginBottom: 10 }}>AVAILABLE BLACK CONTRACTS</div>
-                {[
-                  { name: "Regime Decapitation", desc: "Aegis Defense eliminates a hostile African dictator. Total deniability guaranteed.", cost: 15, contractor: "Aegis Defense", risk: 0.3, reward: { pr: 15, ap: 5 }, penalty: { pr: 20, ap: 25 }, tag: "ASSASSINATION" },
-                  { name: "Rogue Arsenal Destruction", desc: "Obsidian Group sabotages an illegal enrichment facility in Iran. No US footprint.", cost: 25, contractor: "Obsidian Group", risk: 0.4, reward: { pr: 25, ap: 10 }, penalty: { pr: 15, ap: 15 }, tag: "SABOTAGE" },
-                  { name: "Prototype Drone Procurement", desc: "Under-the-table deal with Raytheon: 50 unregistered autonomous swarm drones.", cost: 35, contractor: "Raytheon (Black Book)", risk: 0.1, reward: { pr: 10, ap: 0 }, penalty: { pr: 5, ap: 10 }, tag: "WEAPONS DEAL" },
-                  { name: "Whistleblower Suppression", desc: "A journalist has obtained classified budget documents. Iron Falcon will handle the situation discretely.", cost: 20, contractor: "Iron Falcon Solutions", risk: 0.35, reward: { pr: 8, ap: 12 }, penalty: { pr: 5, ap: 30 }, tag: "DOMESTIC" },
-                  { name: "Opposition Research Package", desc: "Scorpion Analytics will compile comprehensive dossiers on political opponents using NSA intercepts.", cost: 18, contractor: "Scorpion Analytics", risk: 0.25, reward: { pr: 5, ap: 10 }, penalty: { pr: 0, ap: 20 }, tag: "INTEL" },
-                  { name: "Senate Committee Soil Operation", desc: "Phantom Strategies will position assets inside the SASC oversight committee to alert us to investigations.", cost: 30, contractor: "Phantom Strategies", risk: 0.2, reward: { pr: 0, ap: 20 }, penalty: { pr: 0, ap: 40 }, tag: "INFILTRATION" },
-                  { name: "Advanced EMP Arsenal", desc: "Greystone Dynamics back-channels a shipment of classified EMP payloads. No Congressional notification.", cost: 50, contractor: "Greystone Dynamics", risk: 0.15, reward: { pr: 20, ap: 0 }, penalty: { pr: 10, ap: 15 }, tag: "WEAPONS DEAL" },
-                ].map((op, i) => (
-                  <div key={i} className="panel" style={{ padding: 12, marginBottom: 8, borderColor: "#2a2a0a", borderLeft: `3px solid ${op.tag === "ASSASSINATION" ? "#e84b4b" : op.tag === "WEAPONS DEAL" ? "#ffd700" : op.tag === "DOMESTIC" ? "#9b59b6" : "#4b9ae8"}` }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-                      <div style={{ fontSize: 10, color: "#c8b870" }}>{op.name}</div>
-                      <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                        <div style={{ fontSize: 7, color: op.tag === "ASSASSINATION" ? "#e84b4b" : op.tag === "WEAPONS DEAL" ? "#ffd700" : op.tag === "DOMESTIC" ? "#9b59b6" : "#4b9ae8", border: "1px solid", padding: "1px 5px", borderColor: op.tag === "ASSASSINATION" ? "#e84b4b" : op.tag === "WEAPONS DEAL" ? "#ffd700" : op.tag === "DOMESTIC" ? "#9b59b6" : "#4b9ae8" }}>{op.tag}</div>
-                        <div style={{ fontSize: 10, color: "#4caf50", fontFamily: "Oswald,sans-serif" }}>${op.cost}B</div>
-                      </div>
-                    </div>
-                    <div style={{ fontSize: 8, color: "#5a5a3a", marginBottom: 4 }}>{op.desc}</div>
-                    <div style={{ fontSize: 7, color: "#4a5a4a", marginBottom: 8 }}>Via: {op.contractor} · Risk: <span style={{ color: op.risk > 0.3 ? "#e84b4b" : "#e8b84b" }}>{Math.round(op.risk * 100)}% intercept probability</span></div>
-                    <button className="btn btn-gold" style={{ fontSize: 8, width: "100%", padding: 6 }}
-                      disabled={blackBudget < op.cost || activeContracts.length >= 5}
-                      onClick={() => {
-                        setBlackBudget(b => b - op.cost);
-                        setActiveContracts(prev => [...prev, { id: Date.now(), name: op.name, contractor: op.contractor, progress: 0, status: "ACTIVE", risk: op.risk, reward: op.reward, penalty: op.penalty }]);
-                        notify(`Contract Authorized: ${op.contractor}`, "#ffd700");
-                        updateGeneral({ prestige: Math.min(100, (general.prestige || 60) + 2) });
-                      }}
-                    >
-                      {blackBudget < op.cost ? "INSUFFICIENT BLACK FUNDS" : `AUTHORIZE DIRECT TRANSFER $${op.cost}B`}
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ══ CIA INTELLIGENCE GRID ══ */}
-        {tab === "cia" && (() => {
-          const CIA_REGIONS = [
-            { id: "eurasia", label: "EURASIA", threat: "HIGH", icon: "🌐", assets: 12, color: "#4b9ae8", intel: ["FSB operating in Moldova", "Wagner Group active in Belarus", "GRU signals intercepted near NATO border"], cover: 72 },
-            { id: "mideast", label: "MIDDLE EAST", threat: "EXTREME", icon: "☪", assets: 24, color: "#e84b4b", intel: ["IRGC accelerating enrichment at Natanz", "Hezbollah arms shipment via Latakia", "Houthi targeting data obtained from UAE SIGINT"], cover: 61 },
-            { id: "asia", label: "EAST ASIA", threat: "HIGH", icon: "🌏", assets: 18, color: "#e8b84b", intel: ["PLA 5th Fleet repositioning", "DPRK engineers spotted at ICBM facility", "Taiwan Strait carrier transits increasing"], cover: 85 },
-            { id: "africa", label: "SUB-SAHARAN AFRICA", threat: "MEDIUM", icon: "🌍", assets: 8, color: "#4caf50", intel: ["Wagner recruiting in Mali via social media", "Oil infrastructure sabotage planned in Niger Delta", "Chinese surveillance station construction underway"], cover: 58 },
-            { id: "latam", label: "LATIN AMERICA", threat: "MEDIUM", icon: "🌎", assets: 6, color: "#e8b84b", intel: ["Venezuelan regime acquiring Russian EW systems", "Cartel-military nexus in northern Mexico escalating", "Cuban intelligence officers training SEBIN"], cover: 78 },
-            { id: "homefront", label: "DOMESTIC (FBI/JTF)", threat: "ELEVATED", icon: "🏠", assets: 32, color: "#9b59b6", intel: ["Foreign agents embedded in DC contractor scene", "Suspected exfil network via diplomatic pouches", "Extremist chatter elevated near upcoming election"], cover: 91 },
-          ];
-          const ciaAssets = general.ciaAssets || {};
-          const totalAssets = 40;
-          const deployed = Object.values(ciaAssets).reduce((a, b) => a + (b || 0), 0);
-          const available = totalAssets - deployed;
-          return (
-            <div style={{ animation: "fadeUp 0.3s" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-                <div style={{ fontSize: 9, color: "#4b9ae8", letterSpacing: 4 }}>◈ CIA CLANDESTINE SERVICE — GLOBAL ASSET GRID</div>
-                <div style={{ display: "flex", gap: 14 }}>
-                  <div style={{ textAlign: "center" }}>
-                    <div style={{ fontSize: 16, color: "#4b9ae8", fontFamily: "Oswald,sans-serif" }}>{deployed}</div>
-                    <div style={{ fontSize: 7, color: "#5a7a9a", letterSpacing: 2 }}>DEPLOYED</div>
-                  </div>
-                  <div style={{ textAlign: "center" }}>
-                    <div style={{ fontSize: 16, color: "#4caf50", fontFamily: "Oswald,sans-serif" }}>{available}</div>
-                    <div style={{ fontSize: 7, color: "#5a7a5a", letterSpacing: 2 }}>AVAILABLE</div>
                   </div>
                 </div>
               </div>
+            )}
 
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 14 }}>
-                {CIA_REGIONS.map(region => {
-                  const assigned = ciaAssets[region.id] || 0;
-                  const coverPct = Math.min(100, region.cover + assigned * 2);
-                  return (
-                    <div key={region.id} className="panel" style={{ padding: 16, borderLeft: `3px solid ${region.color}` }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
-                        <div>
-                          <div style={{ fontSize: 11, color: region.color, letterSpacing: 2 }}>{region.icon} {region.label}</div>
-                          <div style={{ fontSize: 8, color: region.threat === "EXTREME" ? "#e84b4b" : region.threat === "HIGH" ? "#e8b84b" : "#4caf50", marginTop: 2, letterSpacing: 2 }}>{region.threat} THREAT · {region.assets} KNOWN ASSETS</div>
-                        </div>
-                        <div style={{ textAlign: "center" }}>
-                          <div style={{ fontSize: 20, color: region.color, fontFamily: "Oswald,sans-serif" }}>{assigned}</div>
-                          <div style={{ fontSize: 7, color: "#5a7a5a" }}>AGENTS</div>
-                        </div>
-                      </div>
-                      <div style={{ marginBottom: 10 }}>
-                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 7, color: "#5a7a5a", marginBottom: 3 }}>
-                          <span>COVER INTEGRITY</span><span style={{ color: coverPct > 70 ? "#4caf50" : "#e84b4b" }}>{coverPct}%</span>
-                        </div>
-                        <div style={{ height: 3, background: "#0a1a0a" }}>
-                          <div style={{ height: "100%", width: `${coverPct}%`, background: coverPct > 70 ? "#4caf50" : "#e84b4b", transition: "width 0.5s" }} />
-                        </div>
-                      </div>
-                      <div style={{ fontSize: 8, color: "#4a5a4a", marginBottom: 10, fontStyle: "italic", lineHeight: 1.5 }}>
-                        ◈ Latest: {region.intel[Math.floor((tick || 0) / 50) % region.intel.length]}
-                      </div>
-                      <div style={{ display: "flex", gap: 6 }}>
-                        <button className="btn" style={{ flex: 1, fontSize: 8, padding: "4px 0" }} disabled={available <= 0}
-                          onClick={() => {
-                            if (available <= 0) return notify("NO AVAILABLE CIA ASSETS", "#e84b4b");
-                            updateGeneral({ ciaAssets: { ...ciaAssets, [region.id]: assigned + 1 } });
-                            notify(`Asset deployed to ${region.label}`, "#4b9ae8");
-                          }}>+ DEPLOY ASSET</button>
-                        <button className="btn btn-red" style={{ flex: 1, fontSize: 8, padding: "4px 0" }} disabled={assigned <= 0}
-                          onClick={() => {
-                            if (assigned <= 0) return;
-                            updateGeneral({ ciaAssets: { ...ciaAssets, [region.id]: assigned - 1 } });
-                            notify(`Asset recalled from ${region.label}`, "#e8b84b");
-                          }}>– RECALL</button>
-                        <button className="btn btn-gold" style={{ fontSize: 8, padding: "4px 8px" }}
-                          onClick={() => {
-                            if (assigned < 3) return notify(`INSUFFICIENT ASSETS IN ${region.label} — need 3+`, "#e84b4b");
-                            updateGeneral({ prestige: Math.min(100, pres + 4), approval: Math.min(100, ap + 2) });
-                            notify(`INTEL HARVEST: ${region.label} — classified data exfiltrated. +4 PR, +2 AP`, "#4b9ae8");
-                          }}>⚡ HARVEST INTEL</button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* CIA Covert Action Panel */}
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                <div className="panel" style={{ padding: 16 }}>
-                  <div style={{ fontSize: 9, color: "#4b9ae8", letterSpacing: 4, marginBottom: 12 }}>◈ COVERT ACTION AUTHORITIES</div>
-                  {[
-                    { label: "PRESIDENTIAL FINDING — IRAN", desc: "Authorize disruption of IRGC procurement networks", cost: 8, effect: { ap: -3, pr: 12 } },
-                    { label: "INFLUENCE OPERATION — EASTERN EUROPE", desc: "Deploy IO assets to counter Russian disinfo campaigns", cost: 5, effect: { ap: 5, pr: 8 } },
-                    { label: "RENDITION AUTHORIZATION", desc: "Extraordinary rendition of HVT from partner territory", cost: 12, effect: { ap: -8, pr: 15 } },
-                    { label: "COUNTERINTEL SWEEP — DOMESTIC", desc: "FBI/CIA joint sweep of foreign agent networks", cost: 6, effect: { ap: 6, pr: 5 } },
-                  ].map((action, i) => (
-                    <div key={i} className="choice-card" style={{ marginBottom: 8, borderColor: "#1a2a4a" }} onClick={() => {
-                      if (blackBudget < action.cost) return notify("INSUFFICIENT BLACK BUDGET", "#e84b4b");
-                      setBlackBudget(b => b - action.cost);
-                      updateGeneral({ approval: Math.max(0, Math.min(100, ap + action.effect.ap)), prestige: Math.max(0, Math.min(100, pres + action.effect.pr)) });
-                      notify(`AUTHORIZED: ${action.label}`, "#4b9ae8");
-                    }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                        <div style={{ flex: 1 }}>
-                          <div style={{ fontSize: 9, color: "#8abbff", letterSpacing: 1, marginBottom: 2 }}>{action.label}</div>
-                          <div style={{ fontSize: 7, color: "#4a5a6a" }}>{action.desc}</div>
-                        </div>
-                        <div style={{ textAlign: "right", marginLeft: 8 }}>
-                          <div style={{ fontSize: 9, color: "#4caf50" }}>${action.cost}B</div>
-                          <div style={{ fontSize: 7, color: action.effect.ap > 0 ? "#4caf50" : "#e84b4b" }}>AP{action.effect.ap > 0 ? "+" : ""}{action.effect.ap}</div>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
+            {/* ══ SHADOW OPERATIONS (CONTRACTORS) ══ */}
+            {tab === "shadow" && (
+              <div style={{ animation: "fadeUp 0.3s" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+                  <div style={{ fontSize: 9, color: "#4caf50", letterSpacing: 4 }}>◈ DENIABLE ASSETS & PRIVATE CONTRACTORS</div>
+                  <div style={{ fontSize: 12, color: "#4caf50", fontFamily: "Oswald,sans-serif", padding: "4px 12px", border: "1px solid #4caf50" }}>BLACK BUDGET: ${blackBudget}B</div>
                 </div>
+                {tick < 100 && <div style={{ fontSize: 10, color: "#5a7a5a", fontStyle: "italic", padding: 20 }}>Encrypted channels establishing... Please wait.</div>}
 
-                <div className="panel" style={{ padding: 16 }}>
-                  <div style={{ fontSize: 9, color: "#e84b4b", letterSpacing: 4, marginBottom: 12 }}>◈ ACTIVE ESPIONAGE EVENTS</div>
-                  {[
-                    { event: "MOLE IN NSC STAFF", severity: "CRITICAL", detail: "CI analysis flagged anomalous access patterns in 3 senior staff. Data exfil to foreign IP confirmed.", action: "NEUTRALIZE", color: "#e84b4b" },
-                    { event: "FOREIGN HONEY TRAP — PENTAGON", severity: "HIGH", detail: "DIA officer P. Kerrigan suspected of contact with foreign national. Surveillance underway.", action: "SURVEIL", color: "#e8b84b" },
-                    { event: "CHINESE SATELLITE TRACKING OFFICIAL", severity: "MEDIUM", detail: "SECDEF travel patterns appear in PLA intercepts. Source CARDINAL confirms physical surveillance.", action: "COUNTER-SURVEIL", color: "#4b9ae8" },
-                  ].map((ev, i) => (
-                    <div key={i} style={{ background: "#050a15", border: `1px solid ${ev.color}33`, borderLeft: `3px solid ${ev.color}`, padding: 12, marginBottom: 8 }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-                        <div style={{ fontSize: 9, color: ev.color, letterSpacing: 1 }}>{ev.event}</div>
-                        <div style={{ fontSize: 7, color: ev.color, border: `1px solid ${ev.color}`, padding: "1px 6px" }}>{ev.severity}</div>
-                      </div>
-                      <div style={{ fontSize: 8, color: "#5a7a9a", lineHeight: 1.5, marginBottom: 8 }}>{ev.detail}</div>
-                      <button className="btn" style={{ fontSize: 8, borderColor: ev.color, color: ev.color, width: "100%" }}
-                        onClick={() => { updateGeneral({ prestige: Math.min(100, pres + 6) }); notify(`${ev.action} ordered — CI team deployed. +6 PR`, ev.color); }}>
-                        ▶ ORDER {ev.action}
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          );
-        })()}
-
-        {/* ══ SECRET SERVICE COMMAND ══ */}
-        {tab === "secretservice" && (() => {
-          const protectionLevel = general.ssProtectionLevel || "STANDARD";
-          const pentagonOrders = general.ssOrders || [];
-          const SS_ALERT_LEVELS = [
-            { id: "STANDARD", label: "STANDARD DETAIL", color: "#4caf50", desc: "18-agent protective detail. Standard protocols active." },
-            { id: "ELEVATED", label: "ELEVATED POSTURE", color: "#e8b84b", desc: "24-agent detail, counter-sniper teams deployed, venue pre-sweeps." },
-            { id: "MAXIMUM", label: "MAXIMUM PROTECTION", color: "#e87a4b", desc: "36-agent detail, JSOC QRF on standby, electronic countermeasures active." },
-            { id: "LOCKDOWN", label: "EXECUTIVE LOCKDOWN", color: "#e84b4b", desc: "POTUS movement suspended. Bunker protocols initiated. NMCC on standby." },
-          ];
-          const currentLevel = SS_ALERT_LEVELS.find(l => l.id === protectionLevel) || SS_ALERT_LEVELS[0];
-
-          return (
-            <div style={{ animation: "fadeUp 0.3s" }}>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-                {/* Left — Protection Level & Pentagon Orders */}
-                <div>
-                  <div style={{ fontSize: 9, color: "#4caf50", letterSpacing: 4, marginBottom: 12 }}>◈ PRESIDENTIAL PROTECTION STATUS</div>
-
-                  {/* Current Status Card */}
-                  <div className="panel-gold" style={{ padding: 20, marginBottom: 14, border: `2px solid ${currentLevel.color}` }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-                      <div>
-                        <div style={{ fontSize: 8, color: "#7a6a3a", letterSpacing: 3 }}>CURRENT POSTURE</div>
-                        <div style={{ fontSize: 14, color: currentLevel.color, letterSpacing: 3, fontFamily: "Oswald,sans-serif" }}>{currentLevel.label}</div>
-                      </div>
-                      <div style={{ fontSize: 36 }}>🛡</div>
-                    </div>
-                    <div style={{ fontSize: 9, color: "#8a8a6a", lineHeight: 1.6, marginBottom: 14 }}>{currentLevel.desc}</div>
-                    <div style={{ fontSize: 8, color: "#4caf50" }}>POTUS LOCATION: SECURE · TRACKING ACTIVE · COMMS ENCRYPTED</div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+                  {/* Active Contracts */}
+                  <div className="panel" style={{ padding: 16 }}>
+                    <div style={{ fontSize: 9, color: "#7a9a7a", letterSpacing: 2, marginBottom: 10 }}>ACTIVE SHADOW CONTRACTS</div>
+                    {activeContracts.length === 0 ? <div style={{ fontSize: 8, color: "#4a5a4a", fontStyle: "italic" }}>No active black operations.</div> :
+                      activeContracts.map(c => (
+                        <div key={c.id} style={{ marginBottom: 12, borderBottom: "1px solid #1a2a1a", paddingBottom: 8 }}>
+                          <div style={{ display: "flex", justifyContent: "space-between" }}>
+                            <div style={{ fontSize: 10, color: "#c8ffc8" }}>{c.name}</div>
+                            <div style={{ fontSize: 8, color: c.status === "ACTIVE" ? "#e8b84b" : c.status === "SUCCESS" ? "#4caf50" : "#e84b4b" }}>{c.status}</div>
+                          </div>
+                          <div style={{ fontSize: 8, color: "#5a7a5a", marginTop: 4 }}>{c.contractor}</div>
+                          {c.status === "ACTIVE" && (
+                            <div style={{ height: 2, background: "#0a1a0a", marginTop: 6 }}>
+                              <div style={{ height: "100%", width: `${c.progress}%`, background: "#4caf50", transition: "width 1s linear" }} />
+                            </div>
+                          )}
+                        </div>
+                      ))
+                    }
                   </div>
 
-                  {/* Alert Level Selection */}
-                  <div style={{ fontSize: 9, color: "#7a6a3a", letterSpacing: 3, marginBottom: 10 }}>PENTAGON ORDER — ADJUST PROTECTION LEVEL:</div>
-                  {SS_ALERT_LEVELS.map(level => (
-                    <div key={level.id} className="choice-card" style={{ marginBottom: 6, borderColor: level.id === protectionLevel ? level.color : "#2a2a00", borderLeft: `3px solid ${level.color}` }}
-                      onClick={() => {
-                        updateGeneral({ ssProtectionLevel: level.id });
-                        const apChange = level.id === "LOCKDOWN" ? -5 : level.id === "MAXIMUM" ? 8 : level.id === "ELEVATED" ? 5 : 2;
-                        updateGeneral({ approval: Math.max(0, Math.min(100, ap + apChange)), ssOrders: [...(general.ssOrders || []), { order: `${level.label} AUTHORIZED`, time: new Date().toLocaleTimeString() }] });
-                        notify(`SECRET SERVICE: ${level.label} ORDER ISSUED FROM PENTAGON`, level.color);
-                      }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                        <div>
-                          <div style={{ fontSize: 9, color: level.color, letterSpacing: 1 }}>{level.label}</div>
-                          <div style={{ fontSize: 7, color: "#4a5a4a", marginTop: 2 }}>{level.desc.slice(0, 55)}...</div>
+                  {/* Available Ops & Weapons Deals */}
+                  <div>
+                    <div style={{ fontSize: 9, color: "#e8b84b", letterSpacing: 2, marginBottom: 10 }}>AVAILABLE BLACK CONTRACTS</div>
+                    {[
+                      { name: "Regime Decapitation", desc: "Aegis Defense eliminates a hostile African dictator. Total deniability guaranteed.", cost: 15, contractor: "Aegis Defense", risk: 0.3, reward: { pr: 15, ap: 5 }, penalty: { pr: 20, ap: 25 }, tag: "ASSASSINATION" },
+                      { name: "Rogue Arsenal Destruction", desc: "Obsidian Group sabotages an illegal enrichment facility in Iran. No US footprint.", cost: 25, contractor: "Obsidian Group", risk: 0.4, reward: { pr: 25, ap: 10 }, penalty: { pr: 15, ap: 15 }, tag: "SABOTAGE" },
+                      { name: "Prototype Drone Procurement", desc: "Under-the-table deal with Raytheon: 50 unregistered autonomous swarm drones.", cost: 35, contractor: "Raytheon (Black Book)", risk: 0.1, reward: { pr: 10, ap: 0 }, penalty: { pr: 5, ap: 10 }, tag: "WEAPONS DEAL" },
+                      { name: "Whistleblower Suppression", desc: "A journalist has obtained classified budget documents. Iron Falcon will handle the situation discretely.", cost: 20, contractor: "Iron Falcon Solutions", risk: 0.35, reward: { pr: 8, ap: 12 }, penalty: { pr: 5, ap: 30 }, tag: "DOMESTIC" },
+                      { name: "Opposition Research Package", desc: "Scorpion Analytics will compile comprehensive dossiers on political opponents using NSA intercepts.", cost: 18, contractor: "Scorpion Analytics", risk: 0.25, reward: { pr: 5, ap: 10 }, penalty: { pr: 0, ap: 20 }, tag: "INTEL" },
+                      { name: "Senate Committee Soil Operation", desc: "Phantom Strategies will position assets inside the SASC oversight committee to alert us to investigations.", cost: 30, contractor: "Phantom Strategies", risk: 0.2, reward: { pr: 0, ap: 20 }, penalty: { pr: 0, ap: 40 }, tag: "INFILTRATION" },
+                      { name: "Advanced EMP Arsenal", desc: "Greystone Dynamics back-channels a shipment of classified EMP payloads. No Congressional notification.", cost: 50, contractor: "Greystone Dynamics", risk: 0.15, reward: { pr: 20, ap: 0 }, penalty: { pr: 10, ap: 15 }, tag: "WEAPONS DEAL" },
+                    ].map((op, i) => (
+                      <div key={i} className="panel" style={{ padding: 12, marginBottom: 8, borderColor: "#2a2a0a", borderLeft: `3px solid ${op.tag === "ASSASSINATION" ? "#e84b4b" : op.tag === "WEAPONS DEAL" ? "#ffd700" : op.tag === "DOMESTIC" ? "#9b59b6" : "#4b9ae8"}` }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                          <div style={{ fontSize: 10, color: "#c8b870" }}>{op.name}</div>
+                          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                            <div style={{ fontSize: 7, color: op.tag === "ASSASSINATION" ? "#e84b4b" : op.tag === "WEAPONS DEAL" ? "#ffd700" : op.tag === "DOMESTIC" ? "#9b59b6" : "#4b9ae8", border: "1px solid", padding: "1px 5px", borderColor: op.tag === "ASSASSINATION" ? "#e84b4b" : op.tag === "WEAPONS DEAL" ? "#ffd700" : op.tag === "DOMESTIC" ? "#9b59b6" : "#4b9ae8" }}>{op.tag}</div>
+                            <div style={{ fontSize: 10, color: "#4caf50", fontFamily: "Oswald,sans-serif" }}>${op.cost}B</div>
+                          </div>
                         </div>
-                        {level.id === protectionLevel && <div style={{ fontSize: 9, color: level.color }}>● ACTIVE</div>}
+                        <div style={{ fontSize: 8, color: "#5a5a3a", marginBottom: 4 }}>{op.desc}</div>
+                        <div style={{ fontSize: 7, color: "#4a5a4a", marginBottom: 8 }}>Via: {op.contractor} · Risk: <span style={{ color: op.risk > 0.3 ? "#e84b4b" : "#e8b84b" }}>{Math.round(op.risk * 100)}% intercept probability</span></div>
+                        <button className="btn btn-gold" style={{ fontSize: 8, width: "100%", padding: 6 }}
+                          disabled={blackBudget < op.cost || activeContracts.length >= 5}
+                          onClick={() => {
+                            setBlackBudget(b => b - op.cost);
+                            setActiveContracts(prev => [...prev, { id: Date.now(), name: op.name, contractor: op.contractor, progress: 0, status: "ACTIVE", risk: op.risk, reward: op.reward, penalty: op.penalty }]);
+                            notify(`Contract Authorized: ${op.contractor}`, "#ffd700");
+                            updateGeneral({ prestige: Math.min(100, (general.prestige || 60) + 2) });
+                          }}
+                        >
+                          {blackBudget < op.cost ? "INSUFFICIENT BLACK FUNDS" : `AUTHORIZE DIRECT TRANSFER $${op.cost}B`}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ══ CIA INTELLIGENCE GRID ══ */}
+            {tab === "cia" && (() => {
+              const CIA_REGIONS = [
+                { id: "eurasia", label: "EURASIA", threat: "HIGH", icon: "🌐", assets: 12, color: "#4b9ae8", intel: ["FSB operating in Moldova", "Wagner Group active in Belarus", "GRU signals intercepted near NATO border"], cover: 72 },
+                { id: "mideast", label: "MIDDLE EAST", threat: "EXTREME", icon: "☪", assets: 24, color: "#e84b4b", intel: ["IRGC accelerating enrichment at Natanz", "Hezbollah arms shipment via Latakia", "Houthi targeting data obtained from UAE SIGINT"], cover: 61 },
+                { id: "asia", label: "EAST ASIA", threat: "HIGH", icon: "🌏", assets: 18, color: "#e8b84b", intel: ["PLA 5th Fleet repositioning", "DPRK engineers spotted at ICBM facility", "Taiwan Strait carrier transits increasing"], cover: 85 },
+                { id: "africa", label: "SUB-SAHARAN AFRICA", threat: "MEDIUM", icon: "🌍", assets: 8, color: "#4caf50", intel: ["Wagner recruiting in Mali via social media", "Oil infrastructure sabotage planned in Niger Delta", "Chinese surveillance station construction underway"], cover: 58 },
+                { id: "latam", label: "LATIN AMERICA", threat: "MEDIUM", icon: "🌎", assets: 6, color: "#e8b84b", intel: ["Venezuelan regime acquiring Russian EW systems", "Cartel-military nexus in northern Mexico escalating", "Cuban intelligence officers training SEBIN"], cover: 78 },
+                { id: "homefront", label: "DOMESTIC (FBI/JTF)", threat: "ELEVATED", icon: "🏠", assets: 32, color: "#9b59b6", intel: ["Foreign agents embedded in DC contractor scene", "Suspected exfil network via diplomatic pouches", "Extremist chatter elevated near upcoming election"], cover: 91 },
+              ];
+              const ciaAssets = general.ciaAssets || {};
+              const totalAssets = 40;
+              const deployed = Object.values(ciaAssets).reduce((a, b) => a + (b || 0), 0);
+              const available = totalAssets - deployed;
+              return (
+                <div style={{ animation: "fadeUp 0.3s" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+                    <div style={{ fontSize: 9, color: "#4b9ae8", letterSpacing: 4 }}>◈ CIA CLANDESTINE SERVICE — GLOBAL ASSET GRID</div>
+                    <div style={{ display: "flex", gap: 14 }}>
+                      <div style={{ textAlign: "center" }}>
+                        <div style={{ fontSize: 16, color: "#4b9ae8", fontFamily: "Oswald,sans-serif" }}>{deployed}</div>
+                        <div style={{ fontSize: 7, color: "#5a7a9a", letterSpacing: 2 }}>DEPLOYED</div>
+                      </div>
+                      <div style={{ textAlign: "center" }}>
+                        <div style={{ fontSize: 16, color: "#4caf50", fontFamily: "Oswald,sans-serif" }}>{available}</div>
+                        <div style={{ fontSize: 7, color: "#5a7a5a", letterSpacing: 2 }}>AVAILABLE</div>
                       </div>
                     </div>
-                  ))}
+                  </div>
 
-                  {/* Pentagon Order Log */}
-                  {pentagonOrders.length > 0 && (
-                    <div style={{ marginTop: 14 }}>
-                      <div style={{ fontSize: 9, color: "#3a5a3a", letterSpacing: 3, marginBottom: 8 }}>PENTAGON ORDERS ISSUED:</div>
-                      <div className="panel" style={{ padding: 12, maxHeight: 200, overflowY: "auto" }}>
-                        {pentagonOrders.slice().reverse().slice(0, 8).map((o, i) => (
-                          <div key={i} style={{ padding: "6px 0", borderBottom: "1px solid #0d1a0d", fontSize: 8, color: "#7a9a7a" }}>
-                            <span style={{ color: "#4caf50" }}>{o.time}</span> — {o.order}
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 14 }}>
+                    {CIA_REGIONS.map(region => {
+                      const assigned = ciaAssets[region.id] || 0;
+                      const coverPct = Math.min(100, region.cover + assigned * 2);
+                      return (
+                        <div key={region.id} className="panel" style={{ padding: 16, borderLeft: `3px solid ${region.color}` }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
+                            <div>
+                              <div style={{ fontSize: 11, color: region.color, letterSpacing: 2 }}>{region.icon} {region.label}</div>
+                              <div style={{ fontSize: 8, color: region.threat === "EXTREME" ? "#e84b4b" : region.threat === "HIGH" ? "#e8b84b" : "#4caf50", marginTop: 2, letterSpacing: 2 }}>{region.threat} THREAT · {region.assets} KNOWN ASSETS</div>
+                            </div>
+                            <div style={{ textAlign: "center" }}>
+                              <div style={{ fontSize: 20, color: region.color, fontFamily: "Oswald,sans-serif" }}>{assigned}</div>
+                              <div style={{ fontSize: 7, color: "#5a7a5a" }}>AGENTS</div>
+                            </div>
+                          </div>
+                          <div style={{ marginBottom: 10 }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 7, color: "#5a7a5a", marginBottom: 3 }}>
+                              <span>COVER INTEGRITY</span><span style={{ color: coverPct > 70 ? "#4caf50" : "#e84b4b" }}>{coverPct}%</span>
+                            </div>
+                            <div style={{ height: 3, background: "#0a1a0a" }}>
+                              <div style={{ height: "100%", width: `${coverPct}%`, background: coverPct > 70 ? "#4caf50" : "#e84b4b", transition: "width 0.5s" }} />
+                            </div>
+                          </div>
+                          <div style={{ fontSize: 8, color: "#4a5a4a", marginBottom: 10, fontStyle: "italic", lineHeight: 1.5 }}>
+                            ◈ Latest: {region.intel[Math.floor((tick || 0) / 50) % region.intel.length]}
+                          </div>
+                          <div style={{ display: "flex", gap: 6 }}>
+                            <button className="btn" style={{ flex: 1, fontSize: 8, padding: "4px 0" }} disabled={available <= 0}
+                              onClick={() => {
+                                if (available <= 0) return notify("NO AVAILABLE CIA ASSETS", "#e84b4b");
+                                updateGeneral({ ciaAssets: { ...ciaAssets, [region.id]: assigned + 1 } });
+                                notify(`Asset deployed to ${region.label}`, "#4b9ae8");
+                              }}>+ DEPLOY ASSET</button>
+                            <button className="btn btn-red" style={{ flex: 1, fontSize: 8, padding: "4px 0" }} disabled={assigned <= 0}
+                              onClick={() => {
+                                if (assigned <= 0) return;
+                                updateGeneral({ ciaAssets: { ...ciaAssets, [region.id]: assigned - 1 } });
+                                notify(`Asset recalled from ${region.label}`, "#e8b84b");
+                              }}>– RECALL</button>
+                            <button className="btn btn-gold" style={{ fontSize: 8, padding: "4px 8px" }}
+                              onClick={() => {
+                                if (assigned < 3) return notify(`INSUFFICIENT ASSETS IN ${region.label} — need 3+`, "#e84b4b");
+                                updateGeneral({ prestige: Math.min(100, pres + 4), approval: Math.min(100, ap + 2) });
+                                notify(`INTEL HARVEST: ${region.label} — classified data exfiltrated. +4 PR, +2 AP`, "#4b9ae8");
+                              }}>⚡ HARVEST INTEL</button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* CIA Covert Action Panel */}
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                    <div className="panel" style={{ padding: 16 }}>
+                      <div style={{ fontSize: 9, color: "#4b9ae8", letterSpacing: 4, marginBottom: 12 }}>◈ COVERT ACTION AUTHORITIES</div>
+                      {[
+                        { label: "PRESIDENTIAL FINDING — IRAN", desc: "Authorize disruption of IRGC procurement networks", cost: 8, effect: { ap: -3, pr: 12 } },
+                        { label: "INFLUENCE OPERATION — EASTERN EUROPE", desc: "Deploy IO assets to counter Russian disinfo campaigns", cost: 5, effect: { ap: 5, pr: 8 } },
+                        { label: "RENDITION AUTHORIZATION", desc: "Extraordinary rendition of HVT from partner territory", cost: 12, effect: { ap: -8, pr: 15 } },
+                        { label: "COUNTERINTEL SWEEP — DOMESTIC", desc: "FBI/CIA joint sweep of foreign agent networks", cost: 6, effect: { ap: 6, pr: 5 } },
+                      ].map((action, i) => (
+                        <div key={i} className="choice-card" style={{ marginBottom: 8, borderColor: "#1a2a4a" }} onClick={() => {
+                          if (blackBudget < action.cost) return notify("INSUFFICIENT BLACK BUDGET", "#e84b4b");
+                          setBlackBudget(b => b - action.cost);
+                          updateGeneral({ approval: Math.max(0, Math.min(100, ap + action.effect.ap)), prestige: Math.max(0, Math.min(100, pres + action.effect.pr)) });
+                          notify(`AUTHORIZED: ${action.label}`, "#4b9ae8");
+                        }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                            <div style={{ flex: 1 }}>
+                              <div style={{ fontSize: 9, color: "#8abbff", letterSpacing: 1, marginBottom: 2 }}>{action.label}</div>
+                              <div style={{ fontSize: 7, color: "#4a5a6a" }}>{action.desc}</div>
+                            </div>
+                            <div style={{ textAlign: "right", marginLeft: 8 }}>
+                              <div style={{ fontSize: 9, color: "#4caf50" }}>${action.cost}B</div>
+                              <div style={{ fontSize: 7, color: action.effect.ap > 0 ? "#4caf50" : "#e84b4b" }}>AP{action.effect.ap > 0 ? "+" : ""}{action.effect.ap}</div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="panel" style={{ padding: 16 }}>
+                      <div style={{ fontSize: 9, color: "#e84b4b", letterSpacing: 4, marginBottom: 12 }}>◈ ACTIVE ESPIONAGE EVENTS</div>
+                      {[
+                        { event: "MOLE IN NSC STAFF", severity: "CRITICAL", detail: "CI analysis flagged anomalous access patterns in 3 senior staff. Data exfil to foreign IP confirmed.", action: "NEUTRALIZE", color: "#e84b4b" },
+                        { event: "FOREIGN HONEY TRAP — PENTAGON", severity: "HIGH", detail: "DIA officer P. Kerrigan suspected of contact with foreign national. Surveillance underway.", action: "SURVEIL", color: "#e8b84b" },
+                        { event: "CHINESE SATELLITE TRACKING OFFICIAL", severity: "MEDIUM", detail: "SECDEF travel patterns appear in PLA intercepts. Source CARDINAL confirms physical surveillance.", action: "COUNTER-SURVEIL", color: "#4b9ae8" },
+                      ].map((ev, i) => (
+                        <div key={i} style={{ background: "#050a15", border: `1px solid ${ev.color}33`, borderLeft: `3px solid ${ev.color}`, padding: 12, marginBottom: 8 }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                            <div style={{ fontSize: 9, color: ev.color, letterSpacing: 1 }}>{ev.event}</div>
+                            <div style={{ fontSize: 7, color: ev.color, border: `1px solid ${ev.color}`, padding: "1px 6px" }}>{ev.severity}</div>
+                          </div>
+                          <div style={{ fontSize: 8, color: "#5a7a9a", lineHeight: 1.5, marginBottom: 8 }}>{ev.detail}</div>
+                          <button className="btn" style={{ fontSize: 8, borderColor: ev.color, color: ev.color, width: "100%" }}
+                            onClick={() => { updateGeneral({ prestige: Math.min(100, pres + 6) }); notify(`${ev.action} ordered — CI team deployed. +6 PR`, ev.color); }}>
+                            ▶ ORDER {ev.action}
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* ══ SECRET SERVICE COMMAND ══ */}
+            {tab === "secretservice" && (() => {
+              const protectionLevel = general.ssProtectionLevel || "STANDARD";
+              const pentagonOrders = general.ssOrders || [];
+              const SS_ALERT_LEVELS = [
+                { id: "STANDARD", label: "STANDARD DETAIL", color: "#4caf50", desc: "18-agent protective detail. Standard protocols active." },
+                { id: "ELEVATED", label: "ELEVATED POSTURE", color: "#e8b84b", desc: "24-agent detail, counter-sniper teams deployed, venue pre-sweeps." },
+                { id: "MAXIMUM", label: "MAXIMUM PROTECTION", color: "#e87a4b", desc: "36-agent detail, JSOC QRF on standby, electronic countermeasures active." },
+                { id: "LOCKDOWN", label: "EXECUTIVE LOCKDOWN", color: "#e84b4b", desc: "POTUS movement suspended. Bunker protocols initiated. NMCC on standby." },
+              ];
+              const currentLevel = SS_ALERT_LEVELS.find(l => l.id === protectionLevel) || SS_ALERT_LEVELS[0];
+
+              return (
+                <div style={{ animation: "fadeUp 0.3s" }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+                    {/* Left — Protection Level & Pentagon Orders */}
+                    <div>
+                      <div style={{ fontSize: 9, color: "#4caf50", letterSpacing: 4, marginBottom: 12 }}>◈ PRESIDENTIAL PROTECTION STATUS</div>
+
+                      {/* Current Status Card */}
+                      <div className="panel-gold" style={{ padding: 20, marginBottom: 14, border: `2px solid ${currentLevel.color}` }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                          <div>
+                            <div style={{ fontSize: 8, color: "#7a6a3a", letterSpacing: 3 }}>CURRENT POSTURE</div>
+                            <div style={{ fontSize: 14, color: currentLevel.color, letterSpacing: 3, fontFamily: "Oswald,sans-serif" }}>{currentLevel.label}</div>
+                          </div>
+                          <div style={{ fontSize: 36 }}>🛡</div>
+                        </div>
+                        <div style={{ fontSize: 9, color: "#8a8a6a", lineHeight: 1.6, marginBottom: 14 }}>{currentLevel.desc}</div>
+                        <div style={{ fontSize: 8, color: "#4caf50" }}>POTUS LOCATION: SECURE · TRACKING ACTIVE · COMMS ENCRYPTED</div>
+                      </div>
+
+                      {/* Alert Level Selection */}
+                      <div style={{ fontSize: 9, color: "#7a6a3a", letterSpacing: 3, marginBottom: 10 }}>PENTAGON ORDER — ADJUST PROTECTION LEVEL:</div>
+                      {SS_ALERT_LEVELS.map(level => (
+                        <div key={level.id} className="choice-card" style={{ marginBottom: 6, borderColor: level.id === protectionLevel ? level.color : "#2a2a00", borderLeft: `3px solid ${level.color}` }}
+                          onClick={() => {
+                            updateGeneral({ ssProtectionLevel: level.id });
+                            const apChange = level.id === "LOCKDOWN" ? -5 : level.id === "MAXIMUM" ? 8 : level.id === "ELEVATED" ? 5 : 2;
+                            updateGeneral({ approval: Math.max(0, Math.min(100, ap + apChange)), ssOrders: [...(general.ssOrders || []), { order: `${level.label} AUTHORIZED`, time: new Date().toLocaleTimeString() }] });
+                            notify(`SECRET SERVICE: ${level.label} ORDER ISSUED FROM PENTAGON`, level.color);
+                          }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                            <div>
+                              <div style={{ fontSize: 9, color: level.color, letterSpacing: 1 }}>{level.label}</div>
+                              <div style={{ fontSize: 7, color: "#4a5a4a", marginTop: 2 }}>{level.desc.slice(0, 55)}...</div>
+                            </div>
+                            {level.id === protectionLevel && <div style={{ fontSize: 9, color: level.color }}>● ACTIVE</div>}
+                          </div>
+                        </div>
+                      ))}
+
+                      {/* Pentagon Order Log */}
+                      {pentagonOrders.length > 0 && (
+                        <div style={{ marginTop: 14 }}>
+                          <div style={{ fontSize: 9, color: "#3a5a3a", letterSpacing: 3, marginBottom: 8 }}>PENTAGON ORDERS ISSUED:</div>
+                          <div className="panel" style={{ padding: 12, maxHeight: 200, overflowY: "auto" }}>
+                            {pentagonOrders.slice().reverse().slice(0, 8).map((o, i) => (
+                              <div key={i} style={{ padding: "6px 0", borderBottom: "1px solid #0d1a0d", fontSize: 8, color: "#7a9a7a" }}>
+                                <span style={{ color: "#4caf50" }}>{o.time}</span> — {o.order}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Right — Threat Assessment & Joint Operations */}
+                    <div>
+                      <div style={{ fontSize: 9, color: "#e84b4b", letterSpacing: 4, marginBottom: 12 }}>◈ ACTIVE THREATS TO POTUS</div>
+                      {[
+                        { threat: "SUSPECTED ASSASSINATION PLOT — FOREIGN STATE ACTOR", level: "CRITICAL", source: "NSA INTERCEPT + CIA HUMINT", detail: "Chatter intercept references 'EAGLE' (POTUS codename) and a 3-week window. Iranian Revolutionary Guard involvement suspected.", icon: "☠", color: "#e84b4b" },
+                        { threat: "DOMESTIC EXTREMIST SURVEILLANCE", level: "HIGH", source: "FBI DOMESTIC CI", detail: "Group 'PATRIOT VANGUARD' conducting digital reconnaissance of POTUS rally venues. 14 persons of interest identified.", icon: "⚠", color: "#e87a4b" },
+                        { threat: "CYBER THREAT TO POTUS COMMUNICATIONS", level: "HIGH", source: "CYBERCOM + NSA", detail: "Anomalous probe patterns targeting secure POTUS comms infrastructure. APT suspected.", icon: "💻", color: "#e8b84b" },
+                        { threat: "INFILTRATION ATTEMPT — WHITE HOUSE STAFF", level: "MEDIUM", source: "SECRET SERVICE CI", detail: "Background investigation found discrepancies in a newly hired aide's foreign contacts.", icon: "🔍", color: "#9b59b6" },
+                      ].map((t, i) => (
+                        <div key={i} style={{ background: "#0a0505", border: `1px solid ${t.color}33`, borderLeft: `3px solid ${t.color}`, padding: 14, marginBottom: 10 }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                            <div style={{ fontSize: 9, color: t.color, letterSpacing: 1 }}>{t.icon} {t.threat}</div>
+                            <div style={{ fontSize: 7, color: t.color, border: `1px solid ${t.color}`, padding: "1px 6px" }}>{t.level}</div>
+                          </div>
+                          <div style={{ fontSize: 7, color: "#6a8a6a", marginBottom: 4, letterSpacing: 1 }}>SOURCE: {t.source}</div>
+                          <div style={{ fontSize: 8, color: "#5a7a5a", lineHeight: 1.5, marginBottom: 10 }}>{t.detail}</div>
+                          <div style={{ display: "flex", gap: 6 }}>
+                            <button className="btn" style={{ flex: 1, fontSize: 8, borderColor: t.color, color: t.color }}
+                              onClick={() => {
+                                updateGeneral({ approval: Math.min(100, ap + 5), prestige: Math.min(100, pres + 4) });
+                                notify(`SECRET SERVICE: Counter-response deployed — Threat ${t.level} neutralized. +5 AP, +4 PR`, t.color);
+                              }}>⚡ DEPLOY COUNTER-RESPONSE</button>
+                            <button className="btn btn-gold" style={{ flex: 1, fontSize: 8 }}
+                              onClick={() => {
+                                notify(`JOINT OP: JSOC + Secret Service QRF authorized for threat: ${t.threat.slice(0, 30)}...`, "#ffd700");
+                                updateGeneral({ prestige: Math.min(100, pres + 8) });
+                              }}>🎯 JSOC JOINT OP (+8 PR)</button>
+                          </div>
+                        </div>
+                      ))}
+
+                      {/* Joint JSOC + SS Operations Status */}
+                      <div className="panel" style={{ padding: 16, border: "1px solid #2a2a00", marginTop: 4 }}>
+                        <div style={{ fontSize: 9, color: "#ffd700", letterSpacing: 3, marginBottom: 10 }}>◈ PENTAGON-AUTHORIZED JOINT OPERATIONS</div>
+                        {[
+                          { name: "OPERATION EAGLE SHIELD", desc: "Continuous JSOC QRF within 4min response radius of POTUS", status: "ACTIVE", color: "#4caf50" },
+                          { name: "COUNTERINTEL SCRUB — USSS STAFF", desc: "Ongoing poly + background recheck of all SS agents", status: "ACTIVE", color: "#4caf50" },
+                          { name: "VENUE HARDENING PROTOCOL", desc: "Delta operators pre-deploy to all POTUS public appearances", status: general.ssProtectionLevel === "MAXIMUM" || general.ssProtectionLevel === "LOCKDOWN" ? "ACTIVE" : "STANDBY", color: general.ssProtectionLevel === "MAXIMUM" || general.ssProtectionLevel === "LOCKDOWN" ? "#4caf50" : "#e8b84b" },
+                          { name: "DEEP STATE COMMS BLACKOUT", desc: "All POTUS comms routed through Pentagon-controlled TS/SCI infrastructure", status: "STANDBY", color: "#e8b84b" },
+                        ].map((op, i) => (
+                          <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: "1px solid #1a1a0a" }}>
+                            <div>
+                              <div style={{ fontSize: 9, color: "#c8b870" }}>{op.name}</div>
+                              <div style={{ fontSize: 7, color: "#4a5a4a" }}>{op.desc}</div>
+                            </div>
+                            <div style={{ fontSize: 8, color: op.color, border: `1px solid ${op.color}44`, padding: "2px 8px", letterSpacing: 1 }}>{op.status}</div>
                           </div>
                         ))}
                       </div>
                     </div>
-                  )}
+                  </div>
                 </div>
+              );
+            })()}
 
-                {/* Right — Threat Assessment & Joint Operations */}
-                <div>
-                  <div style={{ fontSize: 9, color: "#e84b4b", letterSpacing: 4, marginBottom: 12 }}>◈ ACTIVE THREATS TO POTUS</div>
-                  {[
-                    { threat: "SUSPECTED ASSASSINATION PLOT — FOREIGN STATE ACTOR", level: "CRITICAL", source: "NSA INTERCEPT + CIA HUMINT", detail: "Chatter intercept references 'EAGLE' (POTUS codename) and a 3-week window. Iranian Revolutionary Guard involvement suspected.", icon: "☠", color: "#e84b4b" },
-                    { threat: "DOMESTIC EXTREMIST SURVEILLANCE", level: "HIGH", source: "FBI DOMESTIC CI", detail: "Group 'PATRIOT VANGUARD' conducting digital reconnaissance of POTUS rally venues. 14 persons of interest identified.", icon: "⚠", color: "#e87a4b" },
-                    { threat: "CYBER THREAT TO POTUS COMMUNICATIONS", level: "HIGH", source: "CYBERCOM + NSA", detail: "Anomalous probe patterns targeting secure POTUS comms infrastructure. APT suspected.", icon: "💻", color: "#e8b84b" },
-                    { threat: "INFILTRATION ATTEMPT — WHITE HOUSE STAFF", level: "MEDIUM", source: "SECRET SERVICE CI", detail: "Background investigation found discrepancies in a newly hired aide's foreign contacts.", icon: "🔍", color: "#9b59b6" },
-                  ].map((t, i) => (
-                    <div key={i} style={{ background: "#0a0505", border: `1px solid ${t.color}33`, borderLeft: `3px solid ${t.color}`, padding: 14, marginBottom: 10 }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-                        <div style={{ fontSize: 9, color: t.color, letterSpacing: 1 }}>{t.icon} {t.threat}</div>
-                        <div style={{ fontSize: 7, color: t.color, border: `1px solid ${t.color}`, padding: "1px 6px" }}>{t.level}</div>
-                      </div>
-                      <div style={{ fontSize: 7, color: "#6a8a6a", marginBottom: 4, letterSpacing: 1 }}>SOURCE: {t.source}</div>
-                      <div style={{ fontSize: 8, color: "#5a7a5a", lineHeight: 1.5, marginBottom: 10 }}>{t.detail}</div>
-                      <div style={{ display: "flex", gap: 6 }}>
-                        <button className="btn" style={{ flex: 1, fontSize: 8, borderColor: t.color, color: t.color }}
-                          onClick={() => {
-                            updateGeneral({ approval: Math.min(100, ap + 5), prestige: Math.min(100, pres + 4) });
-                            notify(`SECRET SERVICE: Counter-response deployed — Threat ${t.level} neutralized. +5 AP, +4 PR`, t.color);
-                          }}>⚡ DEPLOY COUNTER-RESPONSE</button>
-                        <button className="btn btn-gold" style={{ flex: 1, fontSize: 8 }}
-                          onClick={() => {
-                            notify(`JOINT OP: JSOC + Secret Service QRF authorized for threat: ${t.threat.slice(0, 30)}...`, "#ffd700");
-                            updateGeneral({ prestige: Math.min(100, pres + 8) });
-                          }}>🎯 JSOC JOINT OP (+8 PR)</button>
-                      </div>
-                    </div>
-                  ))}
 
-                  {/* Joint JSOC + SS Operations Status */}
-                  <div className="panel" style={{ padding: 16, border: "1px solid #2a2a00", marginTop: 4 }}>
-                    <div style={{ fontSize: 9, color: "#ffd700", letterSpacing: 3, marginBottom: 10 }}>◈ PENTAGON-AUTHORIZED JOINT OPERATIONS</div>
-                    {[
-                      { name: "OPERATION EAGLE SHIELD", desc: "Continuous JSOC QRF within 4min response radius of POTUS", status: "ACTIVE", color: "#4caf50" },
-                      { name: "COUNTERINTEL SCRUB — USSS STAFF", desc: "Ongoing poly + background recheck of all SS agents", status: "ACTIVE", color: "#4caf50" },
-                      { name: "VENUE HARDENING PROTOCOL", desc: "Delta operators pre-deploy to all POTUS public appearances", status: general.ssProtectionLevel === "MAXIMUM" || general.ssProtectionLevel === "LOCKDOWN" ? "ACTIVE" : "STANDBY", color: general.ssProtectionLevel === "MAXIMUM" || general.ssProtectionLevel === "LOCKDOWN" ? "#4caf50" : "#e8b84b" },
-                      { name: "DEEP STATE COMMS BLACKOUT", desc: "All POTUS comms routed through Pentagon-controlled TS/SCI infrastructure", status: "STANDBY", color: "#e8b84b" },
-                    ].map((op, i) => (
-                      <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: "1px solid #1a1a0a" }}>
-                        <div>
-                          <div style={{ fontSize: 9, color: "#c8b870" }}>{op.name}</div>
-                          <div style={{ fontSize: 7, color: "#4a5a4a" }}>{op.desc}</div>
+            {tab === "comms" && (
+              <div style={{ animation: "fadeUp 0.3s" }}>
+                <div style={{ fontSize: 9, color: "#4b9ae8", letterSpacing: 4, marginBottom: 12 }}>◈ SECURE COMMUNICATIONS TERMINAL</div>
+                <div style={{ display: "grid", gridTemplateColumns: "300px 1fr", gap: 14 }}>
+                  {/* INBOX */}
+                  <div className="panel" style={{ padding: 10, minHeight: 400 }}>
+                    <div style={{ fontSize: 9, color: "#7a9a7a", letterSpacing: 2, marginBottom: 10, paddingLeft: 6 }}>ENCRYPTED INBOX ({inbox.filter(m => !m.read).length})</div>
+                    {inbox.length === 0 ? <div style={{ fontSize: 8, color: "#4a5a4a", fontStyle: "italic", padding: 10 }}>Inbox empty. Waiting for secure handshakes...</div> :
+                      inbox.map(msg => (
+                        <div key={msg.id} style={{ padding: "10px 8px", cursor: "pointer", borderBottom: "1px solid #1a2a1a", background: activeCall?.id === msg.id ? "#1a2a4a" : msg.read ? "transparent" : "#0d1d2d", borderLeft: msg.read ? "none" : "3px solid #4b9ae8" }}
+                          onClick={() => {
+                            setInbox(prev => prev.map(m => m.id === msg.id ? { ...m, read: true } : m));
+                            setActiveCall(msg);
+                          }}
+                        >
+                          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, marginBottom: 4 }}>
+                            <span style={{ color: msg.read ? "#8a9a8a" : "#c8ffc8" }}>{msg.sender}</span>
+                            <span style={{ color: "#5a7a5a" }}>{msg.time}</span>
+                          </div>
+                          <div style={{ fontSize: 8, color: msg.read ? "#5a6a5a" : "#8abbff", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{msg.subject}</div>
                         </div>
-                        <div style={{ fontSize: 8, color: op.color, border: `1px solid ${op.color}44`, padding: "2px 8px", letterSpacing: 1 }}>{op.status}</div>
+                      ))
+                    }
+                  </div>
+
+                  {/* MESSAGE BODY */}
+                  <div className="panel" style={{ padding: 20, border: "1px solid #2a3a4a" }}>
+                    {activeCall ? (
+                      <div>
+                        <div style={{ fontSize: 14, color: "#c8ffc8", marginBottom: 6 }}>{activeCall.subject}</div>
+                        <div style={{ fontSize: 9, color: "#4b9ae8", marginBottom: 20, paddingBottom: 10, borderBottom: "1px solid #1a2a3a" }}>FROM: {activeCall.sender} | CLASSIFICATION: TOP SECRET/NOFORN</div>
+                        <div style={{ fontSize: 11, color: "#8a9a8a", lineHeight: 1.8, marginBottom: 40, whiteSpace: "pre-wrap" }}>{activeCall.body}</div>
+
+                        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                          {activeCall.actionType === "PROMOTE" ? (
+                            <>
+                              <button className="btn" style={{ flex: 1, borderColor: "#ffd700", color: "#ffd700" }} onClick={() => {
+                                updateGeneral({
+                                  prestige: Math.max(0, pres - activeCall.costPR),
+                                  approval: Math.min(100, ap + activeCall.gainAP),
+                                  personnelRoster: (general.personnelRoster || []).map(p => p.id === activeCall.soldierId ? { ...p, rank: p.rank + "+" } : p)
+                                });
+                                notify(`${activeCall.soldierName} Promoted! (-${activeCall.costPR} PR, +${activeCall.gainAP} AP)`, "#ffd700");
+                                setActiveCall(null);
+                                setInbox(prev => prev.filter(m => m.id !== activeCall.id));
+                              }}>🎖 PROMOTE (-{activeCall.costPR} PR, +{activeCall.gainAP} AP)</button>
+                              <button className="btn btn-red" style={{ flex: 1 }} onClick={() => { notify("Promotion Denied", "#e84b4b"); setActiveCall(null); setInbox(prev => prev.filter(m => m.id !== activeCall.id)); }}>REJECT</button>
+                            </>
+                          ) : (
+                            <>
+                              <button className="btn" style={{ flex: 1, borderColor: "#4caf50", color: "#4caf50", minWidth: 160 }} onClick={() => { updateGeneral({ prestige: Math.min(100, (general.prestige || 60) + 3), approval: Math.min(100, (general.approval || 70) + 2) }); notify(`Greenlit. ${activeCall.sender} acknowledged. +3 PR, +2 AP`, "#4caf50"); setActiveCall(null); }}>⚡ GREENLIGHT (+3 PR, +2 AP)</button>
+                              <button className="btn btn-gold" style={{ flex: 1, minWidth: 160 }} onClick={() => { notify(`Forwarded to backchannel. Deniability maintained.`, "#e8b84b"); setActiveCall(null); }}>↗ REROUTE TO BACKCHANNEL</button>
+                              <button className="btn btn-red" style={{ flex: 1, minWidth: 160 }} onClick={() => { updateGeneral({ approval: Math.min(100, (general.approval || 70) + 1) }); notify(`Request denied. Message purged from system.`, "#e84b4b"); setActiveCall(null); setInbox(prev => prev.filter(m => m.id !== activeCall.id)); }}>🗑 DENY & PURGE (+1 AP)</button>
+                            </>
+                          )}
+                        </div>
                       </div>
-                    ))}
+                    ) : (
+                      <div style={{ height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "#3a4a5a", fontSize: 10, letterSpacing: 2 }}>SELECT A MESSAGE TO DECRYPT</div>
+                    )}
                   </div>
                 </div>
               </div>
-            </div>
-          );
-        })()}
+            )}
 
 
-        {tab === "comms" && (
-          <div style={{ animation: "fadeUp 0.3s" }}>
-            <div style={{ fontSize: 9, color: "#4b9ae8", letterSpacing: 4, marginBottom: 12 }}>◈ SECURE COMMUNICATIONS TERMINAL</div>
-            <div style={{ display: "grid", gridTemplateColumns: "300px 1fr", gap: 14 }}>
-              {/* INBOX */}
-              <div className="panel" style={{ padding: 10, minHeight: 400 }}>
-                <div style={{ fontSize: 9, color: "#7a9a7a", letterSpacing: 2, marginBottom: 10, paddingLeft: 6 }}>ENCRYPTED INBOX ({inbox.filter(m => !m.read).length})</div>
-                {inbox.length === 0 ? <div style={{ fontSize: 8, color: "#4a5a4a", fontStyle: "italic", padding: 10 }}>Inbox empty. Waiting for secure handshakes...</div> :
-                  inbox.map(msg => (
-                    <div key={msg.id} style={{ padding: "10px 8px", cursor: "pointer", borderBottom: "1px solid #1a2a1a", background: activeCall?.id === msg.id ? "#1a2a4a" : msg.read ? "transparent" : "#0d1d2d", borderLeft: msg.read ? "none" : "3px solid #4b9ae8" }}
-                      onClick={() => {
-                        setInbox(prev => prev.map(m => m.id === msg.id ? { ...m, read: true } : m));
-                        setActiveCall(msg);
-                      }}
-                    >
-                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, marginBottom: 4 }}>
-                        <span style={{ color: msg.read ? "#8a9a8a" : "#c8ffc8" }}>{msg.sender}</span>
-                        <span style={{ color: "#5a7a5a" }}>{msg.time}</span>
-                      </div>
-                      <div style={{ fontSize: 8, color: msg.read ? "#5a6a5a" : "#8abbff", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{msg.subject}</div>
-                    </div>
-                  ))
-                }
-              </div>
 
-              {/* MESSAGE BODY */}
-              <div className="panel" style={{ padding: 20, border: "1px solid #2a3a4a" }}>
-                {activeCall ? (
-                  <div>
-                    <div style={{ fontSize: 14, color: "#c8ffc8", marginBottom: 6 }}>{activeCall.subject}</div>
-                    <div style={{ fontSize: 9, color: "#4b9ae8", marginBottom: 20, paddingBottom: 10, borderBottom: "1px solid #1a2a3a" }}>FROM: {activeCall.sender} | CLASSIFICATION: TOP SECRET/NOFORN</div>
-                    <div style={{ fontSize: 11, color: "#8a9a8a", lineHeight: 1.8, marginBottom: 40, whiteSpace: "pre-wrap" }}>{activeCall.body}</div>
-
-                    <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                      {activeCall.actionType === "PROMOTE" ? (
-                        <>
-                          <button className="btn" style={{ flex: 1, borderColor: "#ffd700", color: "#ffd700" }} onClick={() => {
-                            updateGeneral({
-                              prestige: Math.max(0, pres - activeCall.costPR),
-                              approval: Math.min(100, ap + activeCall.gainAP),
-                              personnelRoster: (general.personnelRoster || []).map(p => p.id === activeCall.soldierId ? { ...p, rank: p.rank + "+" } : p)
-                            });
-                            notify(`${activeCall.soldierName} Promoted! (-${activeCall.costPR} PR, +${activeCall.gainAP} AP)`, "#ffd700");
-                            setActiveCall(null);
-                            setInbox(prev => prev.filter(m => m.id !== activeCall.id));
-                          }}>🎖 PROMOTE (-{activeCall.costPR} PR, +{activeCall.gainAP} AP)</button>
-                          <button className="btn btn-red" style={{ flex: 1 }} onClick={() => { notify("Promotion Denied", "#e84b4b"); setActiveCall(null); setInbox(prev => prev.filter(m => m.id !== activeCall.id)); }}>REJECT</button>
-                        </>
-                      ) : (
-                        <>
-                          <button className="btn" style={{ flex: 1, borderColor: "#4caf50", color: "#4caf50", minWidth: 160 }} onClick={() => { updateGeneral({ prestige: Math.min(100, (general.prestige || 60) + 3), approval: Math.min(100, (general.approval || 70) + 2) }); notify(`Greenlit. ${activeCall.sender} acknowledged. +3 PR, +2 AP`, "#4caf50"); setActiveCall(null); }}>⚡ GREENLIGHT (+3 PR, +2 AP)</button>
-                          <button className="btn btn-gold" style={{ flex: 1, minWidth: 160 }} onClick={() => { notify(`Forwarded to backchannel. Deniability maintained.`, "#e8b84b"); setActiveCall(null); }}>↗ REROUTE TO BACKCHANNEL</button>
-                          <button className="btn btn-red" style={{ flex: 1, minWidth: 160 }} onClick={() => { updateGeneral({ approval: Math.min(100, (general.approval || 70) + 1) }); notify(`Request denied. Message purged from system.`, "#e84b4b"); setActiveCall(null); setInbox(prev => prev.filter(m => m.id !== activeCall.id)); }}>🗑 DENY & PURGE (+1 AP)</button>
-                        </>
-                      )}
-                    </div>
+            {/* FLOATING POTUS BUTTON */}
+            <button onClick={() => setShowPotus(!showPotus)} style={{ position: "fixed", bottom: 60, right: 20, zIndex: 3500, background: "#1a1400", border: "1px solid #ffd700", color: "#ffd700", fontFamily: "'Share Tech Mono',monospace", fontSize: 10, padding: "10px 16px", cursor: "pointer", letterSpacing: 2, boxShadow: "0 0 12px #ffd70044", animation: "goldGlow 3s infinite" }}>
+              🏛 POTUS MEETING
+            </button>
+            {showPotus && (
+              <div style={{ position: "fixed", bottom: 100, right: 20, zIndex: 3500, width: 320, background: "#0a0a00", border: "1px solid #3a3000", padding: 16 }}>
+                <div style={{ fontSize: 9, color: "#7a6a3a", letterSpacing: 3, marginBottom: 10 }}>REQUEST OVAL OFFICE MEETING:</div>
+                {[
+                  { id: "support", label: "EXPRESS FULL SUPPORT", desc: "Reaffirm loyalty", apD: 10, msg: "POTUS nods approvingly. Your loyalty is noted. Trust deepens." },
+                  { id: "advise", label: "STRATEGIC COUNSEL", desc: "Present your assessment", apD: 5, msg: "POTUS listens carefully. 'Good thinking, General.' Respect earned." },
+                  { id: "secret_service", label: "AUTHORIZE JOINT DOMESTIC OP", desc: "JSOC + Secret Service detail", apD: 15, msg: "POTUS beams. 'Having Delta Force guarding my rally makes me rest easy.' Massive AP gain, but constitutional experts are furious." },
+                  { id: "pushback", label: "PUSH BACK", desc: "Challenge an order", apD: -12, msg: "POTUS frowns. 'That's noted, General.' The room goes cold." },
+                  { id: "resign_threat", label: "THREATEN RESIGNATION", desc: "Use your position", apD: -25, msg: "POTUS slams the desk. 'Don't test me, General.' Career on thin ice." },
+                ].map(m => (
+                  <div key={m.id} className="choice-card" style={{ marginBottom: 6, borderColor: "#2a2a00" }} onClick={() => {
+                    updateGeneral({ approval: Math.max(0, Math.min(100, ap + m.apD)), presidentialMeetings: (general.presidentialMeetings || 0) + 1 });
+                    setPresidentialMeet({ msg: m.msg, apD: m.apD });
+                    setShowPotus(false);
+                    notify(m.label + " — Meeting concluded", m.apD > 0 ? "#4caf50" : "#e84b4b");
+                  }}>
+                    <div style={{ fontSize: 10, color: "#c8b870", letterSpacing: 1 }}>{m.label}</div>
+                    <div style={{ fontSize: 8, color: "#4a4a3a", marginTop: 2 }}>{m.desc} ({m.apD > 0 ? "+" : ""}{m.apD} AP)</div>
                   </div>
-                ) : (
-                  <div style={{ height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "#3a4a5a", fontSize: 10, letterSpacing: 2 }}>SELECT A MESSAGE TO DECRYPT</div>
-                )}
+                ))}
               </div>
+            )}
+
+            {/* BOTTOM STATUS */}
+            <div style={{ padding: "8px 20px", borderTop: "1px solid #1a2a1a", display: "flex", gap: 20, alignItems: "center", flexWrap: "wrap", background: "#020904" }}>
+              <div style={{ fontSize: 8, color: "#2a4a2a", letterSpacing: 3 }}>USSOCOM · JSOC · STRATCOM · CYBERCOM · SPACECOM</div>
+              <div style={{ flex: 1 }} />
+              <div style={{ fontSize: 8, color: "#3a5a3a", letterSpacing: 2 }}>PROGRESS SAVED AUTOMATICALLY</div>
+              <div style={{ fontSize: 8, color: "#ffd70066", letterSpacing: 2 }}>★★★★ GENERAL {general.name.toUpperCase()}</div>
             </div>
           </div>
-        )}
-
-
-
-        {/* FLOATING POTUS BUTTON */}
-        <button onClick={() => setShowPotus(!showPotus)} style={{ position: "fixed", bottom: 60, right: 20, zIndex: 3500, background: "#1a1400", border: "1px solid #ffd700", color: "#ffd700", fontFamily: "'Share Tech Mono',monospace", fontSize: 10, padding: "10px 16px", cursor: "pointer", letterSpacing: 2, boxShadow: "0 0 12px #ffd70044", animation: "goldGlow 3s infinite" }}>
-          🏛 POTUS MEETING
-        </button>
-        {showPotus && (
-          <div style={{ position: "fixed", bottom: 100, right: 20, zIndex: 3500, width: 320, background: "#0a0a00", border: "1px solid #3a3000", padding: 16 }}>
-            <div style={{ fontSize: 9, color: "#7a6a3a", letterSpacing: 3, marginBottom: 10 }}>REQUEST OVAL OFFICE MEETING:</div>
-            {[
-              { id: "support", label: "EXPRESS FULL SUPPORT", desc: "Reaffirm loyalty", apD: 10, msg: "POTUS nods approvingly. Your loyalty is noted. Trust deepens." },
-              { id: "advise", label: "STRATEGIC COUNSEL", desc: "Present your assessment", apD: 5, msg: "POTUS listens carefully. 'Good thinking, General.' Respect earned." },
-              { id: "secret_service", label: "AUTHORIZE JOINT DOMESTIC OP", desc: "JSOC + Secret Service detail", apD: 15, msg: "POTUS beams. 'Having Delta Force guarding my rally makes me rest easy.' Massive AP gain, but constitutional experts are furious." },
-              { id: "pushback", label: "PUSH BACK", desc: "Challenge an order", apD: -12, msg: "POTUS frowns. 'That's noted, General.' The room goes cold." },
-              { id: "resign_threat", label: "THREATEN RESIGNATION", desc: "Use your position", apD: -25, msg: "POTUS slams the desk. 'Don't test me, General.' Career on thin ice." },
-            ].map(m => (
-              <div key={m.id} className="choice-card" style={{ marginBottom: 6, borderColor: "#2a2a00" }} onClick={() => {
-                updateGeneral({ approval: Math.max(0, Math.min(100, ap + m.apD)), presidentialMeetings: (general.presidentialMeetings || 0) + 1 });
-                setPresidentialMeet({ msg: m.msg, apD: m.apD });
-                setShowPotus(false);
-                notify(m.label + " — Meeting concluded", m.apD > 0 ? "#4caf50" : "#e84b4b");
-              }}>
-                <div style={{ fontSize: 10, color: "#c8b870", letterSpacing: 1 }}>{m.label}</div>
-                <div style={{ fontSize: 8, color: "#4a4a3a", marginTop: 2 }}>{m.desc} ({m.apD > 0 ? "+" : ""}{m.apD} AP)</div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* BOTTOM STATUS */}
-        <div style={{ padding: "8px 20px", borderTop: "1px solid #1a2a1a", display: "flex", gap: 20, alignItems: "center", flexWrap: "wrap", background: "#020904" }}>
-          <div style={{ fontSize: 8, color: "#2a4a2a", letterSpacing: 3 }}>USSOCOM · JSOC · STRATCOM · CYBERCOM · SPACECOM</div>
-          <div style={{ flex: 1 }} />
-          <div style={{ fontSize: 8, color: "#3a5a3a", letterSpacing: 2 }}>PROGRESS SAVED AUTOMATICALLY</div>
-          <div style={{ fontSize: 8, color: "#ffd70066", letterSpacing: 2 }}>★★★★ GENERAL {general.name.toUpperCase()}</div>
         </div>
       </div>
     </>

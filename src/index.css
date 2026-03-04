@@ -1,1 +1,570 @@
-/* Styles applied directly in component */
+@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Oswald:wght@400;700;900&family=Inter:wght@400;600;800&display=swap');
+
+:root {
+    /* Core Colors */
+    --bg-dark: #020502;
+    --panel-bg: rgba(5, 12, 5, 0.85);
+
+    /* Primary Accents */
+    --neon-green: #00ff41;
+    --neon-green-glow: rgba(0, 255, 65, 0.4);
+    --neon-gold: #ffd700;
+    --neon-gold-glow: rgba(255, 215, 0, 0.4);
+    --neon-red: #ff003c;
+    --neon-red-glow: rgba(255, 0, 60, 0.4);
+    --neon-blue: #00d2ff;
+
+    /* Text & Border */
+    --text-main: #e0e0e0;
+    --text-dim: rgba(255, 255, 255, 0.5);
+    --border-subtle: 1px solid rgba(0, 255, 65, 0.15);
+    --border-hard: 1px solid var(--neon-green);
+    --border-gold: 1px solid var(--neon-gold);
+}
+
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    padding: 0;
+    font-family: 'Inter', 'Share Tech Mono', monospace;
+    background-color: var(--bg-dark);
+    color: var(--text-main);
+    overflow-x: hidden;
+    user-select: none;
+    -webkit-font-smoothing: antialiased;
+}
+
+/* ════════════ BACKGROUND EFFECTS ════════════ */
+/* Matrix Grid */
+body::before {
+    content: "";
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-image:
+        linear-gradient(rgba(0, 255, 65, 0.05) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0, 255, 65, 0.05) 1px, transparent 1px);
+    background-size: 30px 30px;
+    pointer-events: none;
+    z-index: -2;
+    animation: gridDrift 60s linear infinite;
+}
+
+@keyframes gridDrift {
+    from {
+        background-position: 0 0;
+    }
+
+    to {
+        background-position: 30px 30px;
+    }
+}
+
+/* CRT Scanlines */
+body::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(0deg,
+            rgba(0, 0, 0, 0.15) 0px,
+            rgba(0, 0, 0, 0.15) 1px,
+            transparent 1px,
+            transparent 3px);
+    pointer-events: none;
+    z-index: 9999;
+    opacity: 0.8;
+}
+
+/* ════════════ GLOBALS & UTILITIES ════════════ */
+/* Typography overrides for inline styles using Oswald */
+div[style*="Oswald"] {
+    text-transform: uppercase;
+    letter-spacing: 2px !important;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: #000;
+    border-left: 1px solid #111;
+}
+
+::-webkit-scrollbar-thumb {
+    background: rgba(0, 255, 65, 0.3);
+    border-radius: 0;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--neon-green);
+}
+
+/* Common Panels */
+.panel {
+    background: var(--panel-bg) !important;
+    backdrop-filter: blur(8px);
+    border: var(--border-subtle) !important;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5), inset 0 0 20px rgba(0, 255, 65, 0.02);
+    position: relative;
+    transition: all 0.3s;
+}
+
+.panel:hover {
+    border-color: rgba(0, 255, 65, 0.4) !important;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.6), inset 0 0 20px rgba(0, 255, 65, 0.05);
+}
+
+.panel-gold {
+    background: rgba(10, 8, 0, 0.85) !important;
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 215, 0, 0.2) !important;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6), inset 0 0 30px rgba(255, 215, 0, 0.02);
+    transition: all 0.3s;
+}
+
+.panel-gold:hover {
+    border-color: rgba(255, 215, 0, 0.5) !important;
+    box-shadow: 0 4px 30px rgba(255, 215, 0, 0.1), inset 0 0 30px rgba(255, 215, 0, 0.05);
+}
+
+/* Buttons */
+.btn {
+    background: rgba(0, 255, 65, 0.05) !important;
+    border: 1px solid var(--neon-green) !important;
+    color: var(--neon-green) !important;
+    font-family: 'Share Tech Mono', monospace !important;
+    text-transform: uppercase;
+    padding: 10px 20px !important;
+    font-size: 11px !important;
+    letter-spacing: 2px;
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+    transition: all 0.2s cubic-bezier(0.165, 0.84, 0.44, 1) !important;
+    text-shadow: 0 0 8px var(--neon-green-glow);
+}
+
+.btn::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 50%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(0, 255, 65, 0.3), transparent);
+    transform: skewX(-20deg);
+    transition: 0s;
+}
+
+.btn:hover {
+    background: var(--neon-green) !important;
+    color: #000 !important;
+    box-shadow: 0 0 20px var(--neon-green-glow) !important;
+    transform: translateY(-2px);
+    text-shadow: none;
+}
+
+.btn:hover::before {
+    left: 150%;
+    transition: left 0.5s ease-out;
+}
+
+.btn:active {
+    transform: translateY(1px);
+}
+
+.btn-gold {
+    background: rgba(255, 215, 0, 0.05) !important;
+    border-color: var(--neon-gold) !important;
+    color: var(--neon-gold) !important;
+    text-shadow: 0 0 8px var(--neon-gold-glow);
+}
+
+.btn-gold::before {
+    background: linear-gradient(90deg, transparent, rgba(255, 215, 0, 0.3), transparent);
+}
+
+.btn-gold:hover {
+    background: var(--neon-gold) !important;
+    color: #000 !important;
+    box-shadow: 0 0 20px var(--neon-gold-glow) !important;
+    text-shadow: none;
+}
+
+.btn-red {
+    background: rgba(255, 0, 60, 0.05) !important;
+    border-color: var(--neon-red) !important;
+    color: var(--neon-red) !important;
+    text-shadow: 0 0 8px var(--neon-red-glow);
+}
+
+.btn-red::before {
+    background: linear-gradient(90deg, transparent, rgba(255, 0, 60, 0.3), transparent);
+}
+
+.btn-red:hover {
+    background: var(--neon-red) !important;
+    color: #000 !important;
+    box-shadow: 0 0 20px var(--neon-red-glow) !important;
+    text-shadow: none;
+}
+
+/* Tabs */
+.tab-btn {
+    background: transparent !important;
+    border: none !important;
+    border-bottom: 2px solid transparent !important;
+    color: rgba(255, 255, 255, 0.4) !important;
+    font-family: 'Share Tech Mono', monospace !important;
+    padding: 14px 20px !important;
+    font-size: 11px !important;
+    letter-spacing: 2px !important;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.3s !important;
+    text-transform: uppercase;
+}
+
+.tab-btn:hover {
+    color: #fff !important;
+    background: rgba(255, 255, 255, 0.03) !important;
+}
+
+.tab-btn.active {
+    color: var(--neon-green) !important;
+    border-bottom: 2px solid var(--neon-green) !important;
+    background: linear-gradient(0deg, rgba(0, 255, 65, 0.1), transparent) !important;
+    text-shadow: 0 0 10px var(--neon-green-glow);
+}
+
+/* Choice Cards (Hover FX) */
+.choice-card {
+    padding: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.02);
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+    overflow: hidden;
+}
+
+.choice-card::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 3px;
+    background: var(--neon-green);
+    transform: scaleY(0);
+    transition: transform 0.2s;
+}
+
+.choice-card:hover {
+    background: rgba(0, 255, 65, 0.05) !important;
+    border-color: rgba(0, 255, 65, 0.3) !important;
+    transform: translateX(4px);
+}
+
+.choice-card:hover::after {
+    transform: scaleY(1);
+}
+
+/* Glow Utilities */
+.glow-text {
+    text-shadow: 0 0 10px var(--neon-green-glow);
+}
+
+.glow-gold {
+    text-shadow: 0 0 15px var(--neon-gold-glow);
+}
+
+.glow-red {
+    text-shadow: 0 0 15px var(--neon-red-glow);
+    animation: pulseRed 2s infinite;
+}
+
+/* Animations */
+@keyframes fadeUp {
+    0% {
+        opacity: 0;
+        transform: translateY(15px);
+    }
+
+    100% {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes pulseRed {
+
+    0%,
+    100% {
+        opacity: 1;
+        text-shadow: 0 0 15px var(--neon-red-glow);
+    }
+
+    50% {
+        opacity: 0.7;
+        text-shadow: 0 0 5px rgba(255, 0, 60, 0.2);
+    }
+}
+
+@keyframes goldGlow {
+
+    0%,
+    100% {
+        box-shadow: 0 0 12px rgba(255, 215, 0, 0.4);
+        text-shadow: 0 0 8px rgba(255, 215, 0, 0.4);
+    }
+
+    50% {
+        box-shadow: 0 0 25px rgba(255, 215, 0, 0.8);
+        text-shadow: 0 0 15px rgba(255, 215, 0, 0.8);
+    }
+}
+
+@keyframes starDrop {
+    0% {
+        transform: translateY(-100vh);
+        opacity: 0;
+    }
+
+    10% {
+        opacity: 1;
+    }
+
+    90% {
+        opacity: 1;
+    }
+
+    100% {
+        transform: translateY(100vh);
+        opacity: 0;
+    }
+}
+
+/* Form Elements */
+input,
+select,
+textarea {
+    background: rgba(0, 0, 0, 0.5) !important;
+    border: 1px solid rgba(0, 255, 65, 0.3) !important;
+    color: var(--neon-green) !important;
+    font-family: inherit !important;
+    padding: 8px 12px !important;
+    outline: none;
+    border-radius: 0 !important;
+    transition: all 0.3s;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+    border-color: var(--neon-green) !important;
+    box-shadow: 0 0 10px var(--neon-green-glow) !important;
+}
+
+/* Progress Bars */
+.progress-bg {
+    background: rgba(255, 255, 255, 0.05) !important;
+    border-radius: 2px;
+    overflow: hidden;
+    height: 6px !important;
+    position: relative;
+}
+
+.progress-fill {
+    height: 100%;
+    background: var(--neon-green) !important;
+    box-shadow: 0 0 10px var(--neon-green-glow);
+    transition: width 0.5s cubic-bezier(0.165, 0.84, 0.44, 1);
+    position: relative;
+}
+
+.progress-fill::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 20px;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.5));
+}
+
+/* ════════════ EXTREME SIMULATION EFFECTS ════════════ */
+.glitch-text {
+    position: relative;
+}
+
+.glitch-text::before,
+.glitch-text::after {
+    content: attr(data-text);
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: transparent;
+}
+
+.glitch-text::before {
+    left: 2px;
+    text-shadow: -2px 0 red;
+    clip: rect(24px, 550px, 90px, 0);
+    animation: glitch-anim 2s infinite linear alternate-reverse;
+}
+
+.glitch-text::after {
+    left: -2px;
+    text-shadow: -2px 0 blue;
+    clip: rect(85px, 550px, 140px, 0);
+    animation: glitch-anim 2.5s infinite linear alternate-reverse;
+}
+
+@keyframes glitch-anim {
+    0% {
+        clip: rect(22px, 9999px, 86px, 0);
+    }
+
+    5% {
+        clip: rect(61px, 9999px, 83px, 0);
+    }
+
+    10% {
+        clip: rect(110px, 9999px, 10px, 0);
+    }
+
+    15% {
+        clip: rect(28px, 9999px, 79px, 0);
+    }
+
+    20% {
+        clip: rect(104px, 9999px, 20px, 0);
+    }
+
+    25% {
+        clip: rect(24px, 9999px, 56px, 0);
+    }
+
+    30% {
+        clip: rect(65px, 9999px, 80px, 0);
+    }
+
+    35% {
+        clip: rect(54px, 9999px, 30px, 0);
+    }
+
+    40% {
+        clip: rect(81px, 9999px, 4px, 0);
+    }
+
+    45% {
+        clip: rect(64px, 9999px, 89px, 0);
+    }
+
+    50% {
+        clip: rect(96px, 9999px, 11px, 0);
+    }
+
+    55% {
+        clip: rect(41px, 9999px, 90px, 0);
+    }
+
+    60% {
+        clip: rect(2px, 9999px, 99px, 0);
+    }
+
+    65% {
+        clip: rect(32px, 9999px, 41px, 0);
+    }
+
+    70% {
+        clip: rect(83px, 9999px, 60px, 0);
+    }
+
+    75% {
+        clip: rect(16px, 9999px, 67px, 0);
+    }
+
+    80% {
+        clip: rect(43px, 9999px, 3px, 0);
+    }
+
+    85% {
+        clip: rect(78px, 9999px, 12px, 0);
+    }
+
+    90% {
+        clip: rect(39px, 9999px, 75px, 0);
+    }
+
+    95% {
+        clip: rect(7px, 9999px, 56px, 0);
+    }
+
+    100% {
+        clip: rect(107px, 9999px, 97px, 0);
+    }
+}
+
+@keyframes screenShake {
+    0% {
+        transform: translate(1px, 1px) rotate(0deg);
+    }
+
+    10% {
+        transform: translate(-1px, -2px) rotate(-1deg);
+    }
+
+    20% {
+        transform: translate(-3px, 0px) rotate(1deg);
+    }
+
+    30% {
+        transform: translate(3px, 2px) rotate(0deg);
+    }
+
+    40% {
+        transform: translate(1px, -1px) rotate(1deg);
+    }
+
+    50% {
+        transform: translate(-1px, 2px) rotate(-1deg);
+    }
+
+    60% {
+        transform: translate(-3px, 1px) rotate(0deg);
+    }
+
+    70% {
+        transform: translate(3px, 1px) rotate(-1deg);
+    }
+
+    80% {
+        transform: translate(-1px, -1px) rotate(1deg);
+    }
+
+    90% {
+        transform: translate(1px, 2px) rotate(0deg);
+    }
+
+    100% {
+        transform: translate(1px, -2px) rotate(-1deg);
+    }
+}
+
+.shake-intense {
+    animation: screenShake 0.4s cubic-bezier(.36, .07, .19, .97) both;
+}
