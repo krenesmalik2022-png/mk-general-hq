@@ -1,7 +1,218 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { ComposableMap, Geographies, Geography, Marker, Line } from "react-simple-maps";
+import { ComposableMap, Geographies, Geography, Marker, Line, ZoomableGroup } from "react-simple-maps";
 
 const geoUrl = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json";
+
+/* ═══════════════════════════ LIVE MISSION TEMPLATES ════════════════════════════
+   Every mission has:
+   - timerSeconds: how long you have to decide (countdown)
+   - econImpact: what happens to the US economy if you fail / expire
+   - militaryImpact: effect on general stats
+   - phases: multi-step approach — each phase has its own decision
+═══════════════════════════════════════════════════════════════════════════════ */
+const LIVE_MISSION_POOL = [
+  {
+    id: "lm1", title: "OPERATION IRON CORRIDOR",
+    classification: "TOP SECRET // SAP",
+    urgency: "CRITICAL", timerSeconds: 120,
+    theater: "Persian Gulf", lat: 26, lon: 54,
+    situation: "Iranian Revolutionary Guard Corps (IRGC) has seized the oil tanker MV Helios Star with 28 American crew in the Strait of Hormuz. Global oil prices spiked 12% in 3 minutes. OPEC is watching. If you don't act within 2 minutes, Iran will transfer the crew to Bandar Abbas — extraction becomes 10x harder and crude hits $200/barrel.",
+    econImpact: { label: "OIL PRICES +22% — MARKETS CRASH", severity: "CRITICAL", gdpChange: -2.1, unemploymentChange: +0.4 },
+    options: [
+      {
+        label: "SEAL TEAM 6 — MARITIME ASSAULT", icon: "🔱", risk: "HIGH", color: "#e84b4b",
+        outcome: "DEVGRU launches from USS Bataan. 4 minute helo approach under radar. Six-man team breaches MV Helios. Firefight: 3 crew wounded, 2 IRGC KIA. All 28 hostages extracted. Iran protests at UN. Oil drops 8%. POTUS calls it 'exactly what I expect from my best general.'",
+        effect: { approval: +18, prestige: +22, defcon: 0, bankChange: 80000 }
+      },
+      {
+        label: "DIPLOMATIC CHANNEL — DEMAND RELEASE", icon: "📡", risk: "MEDIUM", color: "#e8b84b",
+        outcome: "You route through Swiss embassy. Iran stalls. 6 hours later they release 20 crew but keep 8 as 'insurance.' Oil stabilizes at +9%. Allies frustrated. Senate demands answers. POTUS: 'You should have hit them, General.'",
+        effect: { approval: -8, prestige: -5, defcon: 0, bankChange: 0 }
+      },
+      {
+        label: "CARRIER STRIKE GROUP — SHOW OF FORCE", icon: "⛵", risk: "MEDIUM", color: "#4b9ae8",
+        outcome: "USS Gerald Ford moves into position. Iran sees it on radar and panics — releases all 28 crew within 90 minutes under fear of kinetic action. No shots fired. Oil drops 5%. Textbook deterrence. Prestige skyrockets.",
+        effect: { approval: +12, prestige: +18, defcon: -1, bankChange: 30000 }
+      },
+    ]
+  },
+  {
+    id: "lm2", title: "OPERATION BLACK HARVEST",
+    classification: "TS // SAP // NOFORN",
+    urgency: "CRITICAL", timerSeconds: 90,
+    theater: "Sahel Region", lat: 14, lon: 5,
+    situation: "NSA intercepts reveal Wagner Group is 72 hours from completing a $4.2B Chinese-backed rare earth mining deal in Mali that will permanently cut US access to Cobalt and Lithium supplies critical for F-35, B-21, and nuclear warhead production. The Malian coup government will sign papers in 90 seconds if you don't act NOW. This is an economic weapon of mass destruction.",
+    econImpact: { label: "DEFENSE SUPPLY CHAIN COLLAPSE — F-35 GROUNDED", severity: "EXTREME", gdpChange: -3.8, unemploymentChange: +1.2 },
+    options: [
+      {
+        label: "SPEC OPS DESTROY SIGNING CEREMONY", icon: "💣", risk: "EXTREME", color: "#e84b4b",
+        outcome: "5th Special Forces Group 'disrupts' the ceremony. The Malian minister is unharmed but the signed documents are ash. China lodges furious protest. Wagner vows revenge. Supply chain secured. F-35 production uninterrupted.",
+        effect: { approval: -5, prestige: +25, defcon: -1, bankChange: 50000 }
+      },
+      {
+        label: "EMERGENCY COUNTER-OFFER TO MALI", icon: "💰", risk: "LOW", color: "#4caf50",
+        outcome: "You authorize a $5.1B development package using black budget funds. Mali accepts your offer over Beijing's. Wagner is furious. The global rare earth market stabilizes. US manufacturing sector breathes again. POTUS gets credit at next press conference.",
+        effect: { approval: +20, prestige: +15, defcon: 0, bankChange: -50000 }
+      },
+      {
+        label: "CYBER ATTACK — DESTROY DEAL SERVERS", icon: "🖥", risk: "HIGH", color: "#9b59b6",
+        outcome: "CYBERCOM executes OPERATION SILENT LEDGER. The Malian finance ministry's systems are wiped. The deal data is gone. Papers are unenforceable. Wagner scrambles. US buys 3 months to negotiate a proper deal.",
+        effect: { approval: +8, prestige: +12, defcon: 0, bankChange: 20000 }
+      },
+    ]
+  },
+  {
+    id: "lm3", title: "OPERATION RED MERCURY",
+    classification: "TOP SECRET // NUCLEAR // NOFORN",
+    urgency: "CRITICAL", timerSeconds: 180,
+    theater: "Eastern Europe", lat: 50, lon: 27,
+    situation: "CIA asset CARDINAL in Moscow confirms: Russian President has authorized tactical nuclear weapons to be loaded onto Iskander-M launchers positioned 140km from Kyiv. Satellite confirms warhead loading activity. NATO is paralyzed. You have 3 minutes to recommend a course of action before the launch window opens. European financial markets are melting down in real time.",
+    econImpact: { label: "EUROPEAN MARKET PANIC — DOW -15%", severity: "EXTREME", gdpChange: -4.5, unemploymentChange: +2.1 },
+    options: [
+      {
+        label: "EMERGENCY NATO ARTICLE 5 — UNANIMOUS CALL", icon: "📞", risk: "HIGH", color: "#4b9ae8",
+        outcome: "You personally call all 32 NATO defense chiefs in a 6-minute conference. The unified message is clear: any nuclear use triggers a massive conventional response. Moscow backs down. Launchers are secured. Your phone call is credited with preventing WWIII. Nobel Peace Prize discussions begin.",
+        effect: { approval: +30, prestige: +35, defcon: +1, bankChange: 100000 }
+      },
+      {
+        label: "RECOMMEND PREEMPTIVE CYBER STRIKE ON LAUNCHERS", icon: "⚡", risk: "EXTREME", color: "#e84b4b",
+        outcome: "CYBERCOM kills the Iskander guidance systems. Moscow knows it was US. Russia mobilizes conventional forces. Europe is at the brink but nuclear threat is neutralized. POTUS is furious at the escalation but privately impressed. Defcon drops to 2.",
+        effect: { approval: -15, prestige: +20, defcon: -2, bankChange: 0 }
+      },
+      {
+        label: "DIRECT HOTLINE TO KREMLIN", icon: "☎", risk: "LOW", color: "#4caf50",
+        outcome: "You use the Moscow-Washington Hotline directly — unprecedented for a general officer. Russian counterpart stands down after 40 minutes of tense negotiation. You traded the promise of withdrawing US troops from Poland. POTUS is furious about the deal but the nukes are put away.",
+        effect: { approval: +5, prestige: +28, defcon: 0, bankChange: 0 }
+      },
+    ]
+  },
+  {
+    id: "lm4", title: "OPERATION JADE TSUNAMI",
+    classification: "TOP SECRET // CODE WORD // RELIDO",
+    urgency: "CRITICAL", timerSeconds: 150,
+    theater: "Taiwan Strait", lat: 24, lon: 120,
+    situation: "PLA Navy has launched an unprecedented coordinated amphibious assault on Taiwan's Penghu Islands — 120 ships, airborne divisions, and cyber attacks hitting Taipei simultaneously. Taiwan's President is requesting US military intervention under the Taiwan Relations Act. If you don't respond in the next 2.5 minutes, the islands fall. The south Pacific economic order collapses. TSMC fabs go dark. The entire global semiconductor supply chain dies.",
+    econImpact: { label: "SEMICONDUCTOR COLLAPSE — $6T GLOBAL LOSS", severity: "EXTINCTION", gdpChange: -8.2, unemploymentChange: +4.5 },
+    options: [
+      {
+        label: "FULL NAVAL INTERVENTION — ROE WEAPONS FREE", icon: "⛵", risk: "WAR", color: "#e84b4b",
+        outcome: "7th Fleet engages PLA Navy. First major naval battle since WWII. 72-hour conflict: 14 Chinese destroyers sunk, 3 American ships damaged. PLA amphibious assault repelled. Taiwan holds. Global shock — but markets rally on American resolve. Allies lining up to sign bilateral defense pacts.",
+        effect: { approval: +25, prestige: +40, defcon: -3, bankChange: 200000 }
+      },
+      {
+        label: "AIR POWER ONLY — ESTABLISH NO-FLY ZONE", icon: "✈", risk: "HIGH", color: "#e8b84b",
+        outcome: "F-22s and F-35s establish air dominance. No naval engagement. PLA air force takes heavy losses but ground invasion continues. Penghu falls partially before ceasefire. Taiwan intact but wounded. 'Half measure' criticism dominates the news cycle.",
+        effect: { approval: +8, prestige: +15, defcon: -2, bankChange: 50000 }
+      },
+      {
+        label: "ECONOMIC WARFARE + SANCTIONS PACKAGE", icon: "📊", risk: "LOW", color: "#4caf50",
+        outcome: "You recommend maximum economic sanctions in lieu of military action. China's economy takes a severe hit but Penghu falls. Taiwan survives as a state but China controls the islands. US credibility in Asia is seriously damaged. Japan, South Korea begin nuclear program discussions.",
+        effect: { approval: -10, prestige: -15, defcon: 0, bankChange: 0 }
+      },
+    ]
+  },
+  {
+    id: "lm5", title: "OPERATION DARK MERIDIAN",
+    classification: "TS // SI // TK // NOFORN",
+    urgency: "CRITICAL", timerSeconds: 60,
+    theater: "Cyberspace / CONUS", lat: 38.9, lon: -77,
+    situation: "CYBERCOM detects an active intrusion into 14 US nuclear power plant control systems by a state-level actor (attribution: DPRK). The malware is 60 seconds from triggering a cascading failure that would cause simultaneous meltdowns in Maryland, Pennsylvania, and Virginia. 45 million Americans in the danger zone. Economic damage: $8 trillion. You have ONE MINUTE.",
+    econImpact: { label: "NUCLEAR MELTDOWN — EAST COAST UNINHABITABLE", severity: "EXTINCTION", gdpChange: -15.0, unemploymentChange: +12.0 },
+    options: [
+      {
+        label: "CYBERCOM EMERGENCY KILL SWITCH", icon: "🖥", risk: "HIGH", color: "#4caf50",
+        outcome: "CYBERCOM executes KILL CHAIN Alpha in 37 seconds. All 14 plants go to manual control. 3 cities briefly lose power but reactors are safe. DPRK loses 2 years of cyber capability in the counterattack. You've just prevented the worst disaster in American history.",
+        effect: { approval: +35, prestige: +40, defcon: +1, bankChange: 150000 }
+      },
+      {
+        label: "PHYSICAL ISOLATION — ORDER MANUAL SHUTDOWN", icon: "⚡", risk: "MEDIUM", color: "#e8b84b",
+        outcome: "You authorize emergency physical disconnection of control systems. 11 plants shut down safely. 3 plants experience partial meltdown events — containment holds but evacuation of 600,000 people is required. Costly but survivable. POTUS: 'You made the right call, General.'",
+        effect: { approval: +15, prestige: +20, defcon: 0, bankChange: 50000 }
+      },
+      {
+        label: "CYBER COUNTER-ATTACK — BURN PYONGYANG'S GRID", icon: "💣", risk: "EXTREME", color: "#e84b4b",
+        outcome: "You launch an offensive cyber strike on North Korea's entire power infrastructure simultaneously. Their malware dies as their control servers fry. Your plants are saved. North Korea is in total blackout. Kim is enraged. Military escalation begins. Defcon drops to 2.",
+        effect: { approval: +10, prestige: +25, defcon: -2, bankChange: 0 }
+      },
+    ]
+  },
+  {
+    id: "lm6", title: "OPERATION VIPER'S NEST",
+    classification: "SAP // CODE WORD: VIPER",
+    urgency: "HIGH", timerSeconds: 300,
+    theater: "Afghanistan / Pakistan Border", lat: 34, lon: 70,
+    situation: "CIA has a 5-minute window on an HVT (High Value Target): confirmed location of Al-Qaeda's Emir who is planning a simultaneous 9/11-scale attack on 6 US embassies across Africa. The target is in an unacknowledged Pakistani territory. Any strike violates Pakistani sovereignty. If you miss this window, the embassies get hit — 3,000+ casualties and global diplomatic crisis.",
+    econImpact: { label: "EMBASSY ATTACKS — GLOBAL TRAVEL BAN, TOURISM -80%", severity: "HIGH", gdpChange: -1.8, unemploymentChange: +0.6 },
+    options: [
+      {
+        label: "DRONE STRIKE — IMMEDIATE ACTION", icon: "🎯", risk: "HIGH", color: "#e84b4b",
+        outcome: "MQ-9 Reaper fires two Hellfire missiles. Target confirmed KIA. 3 civilian casualties nearby. Pakistan protests furiously. But the 6 embassy attacks are prevented. 3,000 lives saved. The families of those civilians will never know how many lives you saved today.",
+        effect: { approval: +15, prestige: +28, defcon: 0, bankChange: 100000 }
+      },
+      {
+        label: "SEAL TEAM CAPTURE OPERATION", icon: "🔱", risk: "EXTREME", color: "#e8b84b",
+        outcome: "DEVGRU executes capture mission. 40-minute firefight. Target captured alive — intelligence goldmine. 2 SEALs wounded. Pakistan disavows but privately thanks you. Target is interrogated at black site. 14 follow-on operations disrupted from intelligence gathered.",
+        effect: { approval: +20, prestige: +35, defcon: 0, bankChange: 80000 }
+      },
+      {
+        label: "EVACUATE EMBASSIES — DO NOT STRIKE", icon: "🚁", risk: "LOW", color: "#4caf50",
+        outcome: "You refuse to violate Pakistani sovereignty. All 6 embassies are evacuated. The attacks happen to empty buildings. Target escapes. The HVT goes dark and reappears 14 months later planning a new attack. Your restraint saved a diplomatic relationship but costs lives long-term.",
+        effect: { approval: +5, prestige: -10, defcon: 0, bankChange: 0 }
+      },
+    ]
+  },
+  {
+    id: "lm7", title: "OPERATION GOLDEN STORM",
+    classification: "TOP SECRET // POTUS EYES ONLY",
+    urgency: "CRITICAL", timerSeconds: 240,
+    theater: "Saudi Arabia", lat: 24, lon: 45,
+    situation: "A massive coordinated Houthi drone swarm — 300+ Iranian-supplied kamikaze drones — has launched against Aramco's Abqaiq facility, the world's largest oil processing plant. If it's destroyed, global oil supply drops 5% instantly. Every second of delay: fuel prices at the pump increase $0.12. You have 4 minutes before the drones reach the facility.",
+    econImpact: { label: "ARAMCO DESTROYED — FUEL $12/GALLON OVERNIGHT", severity: "EXTREME", gdpChange: -3.1, unemploymentChange: +0.9 },
+    options: [
+      {
+        label: "PATRIOT BATTERIES + F-35 INTERCEPT PACKAGE", icon: "🚀", risk: "MEDIUM", color: "#4caf50",
+        outcome: "Your air defense package combined with Saudi Patriots eliminates 287 of 300 drones. 13 breach — minor damage to secondary facility. Oil impact minimal: +$4/barrel instead of +$40. Saudi King calls personally to thank you. Massive defense contract incoming.",
+        effect: { approval: +22, prestige: +28, defcon: 0, bankChange: 200000 }
+      },
+      {
+        label: "STRIKE HOUTHI LAUNCH SITES IN YEMEN", icon: "✈", risk: "HIGH", color: "#e87a4b",
+        outcome: "B-52s hit 8 Houthi launch complexes. Secondary explosions destroy future attack capability. Aramco takes partial hit from second wave — oil up 15% but not 40%. Iran retaliates with Quds Force attacks on 2 US bases in Iraq. 14 soldiers wounded.",
+        effect: { approval: +10, prestige: +20, defcon: -1, bankChange: 50000 }
+      },
+      {
+        label: "CYBER KILL CHAIN ON DRONE GUIDANCE", icon: "🖥", risk: "HIGH", color: "#9b59b6",
+        outcome: "CYBERCOM targets the Iranian drone command frequencies. 180 drones veer off course into the desert. 120 break through with navigational errors and hit a secondary separator facility. Oil up 18%. Solid outcome but not the total intercept you hoped for.",
+        effect: { approval: +12, prestige: +15, defcon: 0, bankChange: 30000 }
+      },
+    ]
+  },
+  {
+    id: "lm8", title: "OPERATION FROZEN THRONE",
+    classification: "TOP SECRET // SPECIAL CHANNEL",
+    urgency: "HIGH", timerSeconds: 200,
+    theater: "Arctic Ocean", lat: 75, lon: -10,
+    situation: "Russian submarines have cut the CANTAT-3 and TAT-14 transatlantic fiber optic cables — 30% of internet traffic between North America and Europe is dead. Stock markets in London and Frankfurt crash 8% in minutes. Russia is claiming it was 'maintenance vessels' but your signals intelligence shows it was deliberate. Every minute of inaction costs $2.4B in economic damage.",
+    econImpact: { label: "TRANSATLANTIC INTERNET DOWN — $340B/DAY LOSS", severity: "EXTREME", gdpChange: -2.8, unemploymentChange: +0.5 },
+    options: [
+      {
+        label: "SUBMARINE — TRACK AND SHADOW AGGRESSIVELY", icon: "🌊", risk: "HIGH", color: "#4b9ae8",
+        outcome: "USS Jimmy Carter SSN intercepts and begins aggressive shadowing of the Russian OSCAR-II class submarine. Russians surface. You control the underwater domain. Cable repair ships reach the cut points under your protection. Internet restored in 36 hours. Markets rally 6%.",
+        effect: { approval: +18, prestige: +22, defcon: -1, bankChange: 80000 }
+      },
+      {
+        label: "EMERGENCY SATELLITE BANDWIDTH REROUTE", icon: "🛰", risk: "LOW", color: "#4caf50",
+        outcome: "Space Force emergency activates Starlink and military satellites to reroute 60% of affected traffic. Markets absorb the shock. Russia is exposed diplomatically but unpunished militarily. Cable repair takes 2 weeks but the economic damage is contained. Clean, smart solution.",
+        effect: { approval: +25, prestige: +18, defcon: 0, bankChange: 40000 }
+      },
+      {
+        label: "SINK THE RUSSIAN SUBMARINE", icon: "💣", risk: "WAR", color: "#e84b4b",
+        outcome: "You order USS Wyoming to fire. The OSCAR-II class 'Orel' sinks in Arctic waters. 107 Russian sailors die. Moscow goes into war footing. NATO activates Article 5. First conventional NATO-Russia conflict in history begins. Economic damage: immeasurable.",
+        effect: { approval: -25, prestige: +5, defcon: -3, bankChange: 0 }
+      },
+    ]
+  },
+];
+
 const SAVE_KEY = "specops-general-v1";
 async function loadSave() {
   try { const r = await window.storage.get(SAVE_KEY); return r ? JSON.parse(r.value) : null; } catch { return null; }
@@ -180,85 +391,190 @@ function DefconDisplay({ defcon }) {
   );
 }
 
-/* ═══════════════════════════ SITUATION MAP ══════════════════════════════════ */
-function SituationMap({ zones, deployments, onZoneClick }) {
+/* ═══════════════════════════ TACTICAL BOARD MAP ════════════════════════════ */
+function TacticalBoard({ zones, deployments, liveMissions, onZoneClick, onMissionClick }) {
+  const [zoom, setZoom] = useState(1);
+  const [center, setCenter] = useState([0, 20]);
   const [hovered, setHovered] = useState(null);
+  const [placingPin, setPlacingPin] = useState(null); // "friendly" | "enemy" | "objective" | null
+  const [pins, setPins] = useState([]);
+  const [threatCircles, setThreatCircles] = useState([]);
+  const [showGrid, setShowGrid] = useState(true);
+  const [showLabels, setShowLabels] = useState(true);
+  const [mouseCoords, setMouseCoords] = useState(null);
+  const [selectedPin, setSelectedPin] = useState(null);
+
+  const PIN_TYPES = {
+    friendly: { color: "#4caf50", icon: "▲", label: "FRIENDLY UNIT" },
+    enemy: { color: "#e84b4b", icon: "✕", label: "ENEMY FORCE" },
+    objective: { color: "#ffd700", icon: "★", label: "OBJECTIVE" },
+    strike: { color: "#e87a4b", icon: "⚡", label: "STRIKE PACKAGE" },
+    intel: { color: "#4b9ae8", icon: "◈", label: "INTEL ASSET" },
+  };
+
+  const handleMapClick = (e, coords) => {
+    if (placingPin && coords) {
+      const [lon, lat] = coords;
+      const newPin = {
+        id: Date.now(),
+        type: placingPin,
+        lon, lat,
+        label: `${PIN_TYPES[placingPin].label} ${pins.length + 1}`,
+        timestamp: new Date().toLocaleTimeString(),
+      };
+      setPins(p => [...p, newPin]);
+      if (e.shiftKey) return; // keep placing
+      setPlacingPin(null);
+    }
+  };
+
   return (
-    <div style={{ position: "relative", border: "1px solid #2a2a00", background: "#020a02", overflow: "hidden" }}>
-      <ComposableMap projection="geoMercator" projectionConfig={{ scale: 120 }} width={800} height={400} style={{ width: "100%", display: "block" }}>
-
-        <Geographies geography={geoUrl}>
-          {({ geographies }) =>
-            geographies.map((geo) => (
-              <Geography
-                key={geo.rsmKey}
-                geography={geo}
-                fill="#0a1a0a"
-                stroke="#1a3a1a"
-                strokeWidth={0.5}
-                style={{
-                  default: { outline: "none" },
-                  hover: { fill: "#0f1f0f", outline: "none" },
-                  pressed: { outline: "none" },
-                }}
-              />
-            ))
-          }
-        </Geographies>
-
-        {deployments.map((dep, i) => (
-          <Line
-            key={i}
-            from={[-77.0369, 38.9072]}
-            to={[dep.lon, dep.lat]}
-            stroke={dep.color || "#4caf5044"}
-            strokeWidth={1}
-            strokeDasharray="3,3"
-            opacity={0.6}
-            style={{ pointerEvents: "none" }}
-          />
+    <div style={{ position: "relative", background: "#010804", border: "1px solid #1a3a1a", overflow: "hidden" }}>
+      {/* TACTICAL TOOLBAR */}
+      <div style={{ display: "flex", gap: 6, padding: "8px 12px", background: "#020a04", borderBottom: "1px solid #1a3a1a", alignItems: "center", flexWrap: "wrap" }}>
+        <div style={{ fontSize: 8, color: "#3a5a3a", letterSpacing: 3, marginRight: 8 }}>TACTICAL BOARD</div>
+        {Object.entries(PIN_TYPES).map(([type, cfg]) => (
+          <button key={type} onClick={() => setPlacingPin(placingPin === type ? null : type)}
+            style={{ background: placingPin === type ? cfg.color + "22" : "transparent", border: `1px solid ${placingPin === type ? cfg.color : "#2a3a2a"}`, color: placingPin === type ? cfg.color : "#5a7a5a", fontFamily: "monospace", fontSize: 9, padding: "3px 10px", cursor: "pointer", letterSpacing: 1, transition: "all 0.15s" }}>
+            {cfg.icon} {type.toUpperCase()}
+          </button>
         ))}
+        <div style={{ flex: 1 }} />
+        <button onClick={() => setShowGrid(g => !g)} style={{ background: showGrid ? "#1a2a1a" : "transparent", border: "1px solid #2a3a2a", color: showGrid ? "#4caf50" : "#3a5a3a", fontFamily: "monospace", fontSize: 8, padding: "3px 8px", cursor: "pointer" }}>GRID</button>
+        <button onClick={() => setShowLabels(l => !l)} style={{ background: showLabels ? "#1a2a1a" : "transparent", border: "1px solid #2a3a2a", color: showLabels ? "#4caf50" : "#3a5a3a", fontFamily: "monospace", fontSize: 8, padding: "3px 8px", cursor: "pointer" }}>LABELS</button>
+        <button onClick={() => { setPins([]); setThreatCircles([]); }} style={{ background: "transparent", border: "1px solid #3a1a1a", color: "#e84b4b", fontFamily: "monospace", fontSize: 8, padding: "3px 8px", cursor: "pointer" }}>CLR</button>
+        <button onClick={() => setZoom(z => Math.min(z + 0.5, 8))} style={{ background: "transparent", border: "1px solid #2a3a2a", color: "#c8ffc8", fontFamily: "monospace", fontSize: 10, padding: "2px 8px", cursor: "pointer" }}>+</button>
+        <div style={{ fontSize: 9, color: "#5a7a5a", fontFamily: "monospace", minWidth: 30, textAlign: "center" }}>{zoom}x</div>
+        <button onClick={() => setZoom(z => Math.max(z - 0.5, 0.5))} style={{ background: "transparent", border: "1px solid #2a3a2a", color: "#c8ffc8", fontFamily: "monospace", fontSize: 10, padding: "2px 8px", cursor: "pointer" }}>−</button>
+        <button onClick={() => { setZoom(1); setCenter([0, 20]); }} style={{ background: "transparent", border: "1px solid #2a3a2a", color: "#7a9a7a", fontFamily: "monospace", fontSize: 8, padding: "3px 8px", cursor: "pointer" }}>RESET</button>
+      </div>
 
-        {zones.map(z => {
-          const isH = hovered === z.id;
-          return (
-            <Marker
-              key={z.id}
-              coordinates={[z.lon, z.lat]}
-              onClick={() => onZoneClick(z)}
-              onMouseEnter={() => setHovered(z.id)}
-              onMouseLeave={() => setHovered(null)}
-              style={{ cursor: "pointer" }}
-            >
-              <circle r="14" fill="none" stroke={z.color} strokeWidth="1" opacity="0.3">
-                <animate attributeName="r" values="10;20;10" dur="2.5s" repeatCount="indefinite" />
-                <animate attributeName="opacity" values="0.4;0;0.4" dur="2.5s" repeatCount="indefinite" />
+      {/* PLACING PIN INDICATOR */}
+      {placingPin && (
+        <div style={{ position: "absolute", top: 52, left: "50%", transform: "translateX(-50%)", background: "#0a1a0a", border: `1px solid ${PIN_TYPES[placingPin].color}`, padding: "4px 16px", zIndex: 20, fontSize: 9, color: PIN_TYPES[placingPin].color, letterSpacing: 2, animation: "pulse 1s infinite" }}>
+          CLICK MAP TO PLACE {PIN_TYPES[placingPin].label} · SHIFT+CLICK FOR MULTI-PLACE · ESC TO CANCEL
+        </div>
+      )}
+
+      {/* MAP */}
+      <ComposableMap
+        projection="geoMercator"
+        projectionConfig={{ scale: 120 }}
+        width={800} height={420}
+        style={{ width: "100%", display: "block", cursor: placingPin ? "crosshair" : "grab" }}
+      >
+        <ZoomableGroup zoom={zoom} center={center} onMoveEnd={({ zoom: z, coordinates: c }) => { setZoom(z); setCenter(c); }}>
+          {/* BASE GEOGRAPHY */}
+          <Geographies geography={geoUrl}>
+            {({ geographies }) => geographies.map((geo) => (
+              <Geography key={geo.rsmKey} geography={geo}
+                fill="#0a1a0a" stroke="#1a3a1a" strokeWidth={0.3}
+                style={{ default: { outline: "none" }, hover: { fill: "#0f230f", outline: "none" }, pressed: { outline: "none" } }}
+              />
+            ))}
+          </Geographies>
+
+          {/* DEPLOYMENT LINES FROM PENTAGON */}
+          {deployments.map((dep, i) => (
+            <Line key={i} from={[-77.0369, 38.9072]} to={[dep.lon ?? 0, dep.lat ?? 0]}
+              stroke="#4caf5066" strokeWidth={0.8} strokeDasharray="4,4" style={{ pointerEvents: "none" }} />
+          ))}
+
+          {/* LIVE MISSION MARKERS */}
+          {(liveMissions || []).filter(m => m.lat && m.lon).map(m => (
+            <Marker key={m.id} coordinates={[m.lon, m.lat]} onClick={() => onMissionClick?.(m)} style={{ cursor: "pointer" }}>
+              <circle r="18" fill="none" stroke="#e84b4b" strokeWidth="1" opacity="0.4">
+                <animate attributeName="r" values="12;24;12" dur="1.5s" repeatCount="indefinite" />
+                <animate attributeName="opacity" values="0.6;0;0.6" dur="1.5s" repeatCount="indefinite" />
               </circle>
-              <circle r={isH ? 9 : 7} fill={z.color + "33"} stroke={z.color} strokeWidth={isH ? 2 : 1} style={{ transition: "all 0.2s" }} />
-              <text y={4} textAnchor="middle" fontSize="7" fill={z.color} fontFamily="monospace">⚠</text>
-              <text y={22} textAnchor="middle" fontSize="7.5" fill={isH ? "#c8ffc8" : z.color + "cc"} fontFamily="monospace">{z.name}</text>
-              {isH && (
-                <g>
-                  <rect x={-70} y={26} width="140" height="28" fill="#050d05" stroke={z.color} strokeWidth="1" rx="1" />
-                  <text y={38} textAnchor="middle" fontSize="7" fill="#c8c870" fontFamily="monospace">{z.threat} THREAT</text>
-                  <text y={50} textAnchor="middle" fontSize="6.5" fill="#7a8a7a" fontFamily="monospace">{z.troops.toLocaleString()} troops</text>
-                </g>
-              )}
+              <circle r="9" fill="#e84b4b22" stroke="#e84b4b" strokeWidth="2" />
+              <text y={4} textAnchor="middle" fontSize="8" fill="#e84b4b" fontFamily="monospace">⚠</text>
+              {showLabels && <text y={20} textAnchor="middle" fontSize="6.5" fill="#e84b4b" fontFamily="monospace">{m.title.split(" ").slice(-1)[0]}</text>}
             </Marker>
-          );
-        })}
+          ))}
+
+          {/* HOT ZONE MARKERS */}
+          {zones.map(z => {
+            const isH = hovered === z.id;
+            return (
+              <Marker key={z.id} coordinates={[z.lon, z.lat]}
+                onClick={() => onZoneClick(z)}
+                onMouseEnter={() => setHovered(z.id)}
+                onMouseLeave={() => setHovered(null)}
+                style={{ cursor: "pointer" }}>
+                <circle r="14" fill="none" stroke={z.color} strokeWidth="1" opacity="0.3">
+                  <animate attributeName="r" values="8;16;8" dur="2.5s" repeatCount="indefinite" />
+                  <animate attributeName="opacity" values="0.4;0;0.4" dur="2.5s" repeatCount="indefinite" />
+                </circle>
+                <circle r={isH ? 8 : 6} fill={z.color + "22"} stroke={z.color} strokeWidth={isH ? 2 : 1} style={{ transition: "all 0.2s" }} />
+                <text y={3} textAnchor="middle" fontSize="6" fill={z.color} fontFamily="monospace">⚠</text>
+                {showLabels && <text y={18} textAnchor="middle" fontSize="6.5" fill={isH ? "#c8ffc8" : z.color + "cc"} fontFamily="monospace">{z.name}</text>}
+                {isH && (
+                  <g>
+                    <rect x={-70} y={22} width="140" height="32" fill="#050d05" stroke={z.color} strokeWidth="0.5" rx="1" />
+                    <text y={34} textAnchor="middle" fontSize="6.5" fill="#c8c870" fontFamily="monospace">{z.threat} THREAT</text>
+                    <text y={46} textAnchor="middle" fontSize="6" fill="#7a8a7a" fontFamily="monospace">{z.troops.toLocaleString()} US forces</text>
+                  </g>
+                )}
+              </Marker>
+            );
+          })}
+
+          {/* USER-PLACED TACTICAL PINS */}
+          {pins.map(pin => {
+            const cfg = PIN_TYPES[pin.type];
+            return (
+              <Marker key={pin.id} coordinates={[pin.lon, pin.lat]} onClick={() => setSelectedPin(selectedPin?.id === pin.id ? null : pin)} style={{ cursor: "pointer" }}>
+                <circle r="10" fill={cfg.color + "22"} stroke={cfg.color} strokeWidth="1.5" />
+                <text y={4} textAnchor="middle" fontSize="9" fill={cfg.color} fontFamily="monospace">{cfg.icon}</text>
+                {showLabels && <text y={18} textAnchor="middle" fontSize="6" fill={cfg.color + "cc"} fontFamily="monospace">{pin.label.split(" ").slice(-2).join(" ")}</text>}
+                {selectedPin?.id === pin.id && (
+                  <g>
+                    <rect x={-65} y={22} width="130" height="40" fill="#050d05" stroke={cfg.color} strokeWidth="0.5" rx="1" />
+                    <text y={34} textAnchor="middle" fontSize="6.5" fill={cfg.color} fontFamily="monospace">{pin.label}</text>
+                    <text y={46} textAnchor="middle" fontSize="5.5" fill="#7a8a7a" fontFamily="monospace">{pin.lon.toFixed(2)}°, {pin.lat.toFixed(2)}°</text>
+                    <text y={57} textAnchor="middle" fontSize="5" fill="#3a5a3a" fontFamily="monospace">{pin.timestamp}</text>
+                  </g>
+                )}
+              </Marker>
+            );
+          })}
+        </ZoomableGroup>
       </ComposableMap>
 
-      {/* Grid and Overlays */}
-      <div style={{ position: "absolute", inset: 0, pointerEvents: "none", background: "repeating-linear-gradient(0deg, transparent, transparent 49px, rgba(13,26,13,0.3) 50px), repeating-linear-gradient(90deg, transparent, transparent 49px, rgba(13,26,13,0.3) 50px)" }} />
-      <div style={{ position: "absolute", top: "50%", left: 0, right: 0, height: "1px", borderTop: "1px dashed #1a3a1a", pointerEvents: "none" }} />
-      <div style={{ position: "absolute", bottom: 10, left: 10, fontSize: "10px", color: "#3a5a3a", fontFamily: "monospace", pointerEvents: "none" }}>GLOBAL SITUATION MAP · CLASSIFICATION: TOP SECRET</div>
-      <div style={{ position: "absolute", bottom: 10, right: 10, fontSize: "10px", color: "#3a5a3a", fontFamily: "monospace", pointerEvents: "none" }}>⚠ HOT ZONE  ── DEPLOYMENT</div>
+      {/* GRID OVERLAY */}
+      {showGrid && (
+        <div style={{
+          position: "absolute", inset: 0, pointerEvents: "none",
+          background: "repeating-linear-gradient(0deg,transparent,transparent 49px,rgba(26,74,26,0.15) 50px),repeating-linear-gradient(90deg,transparent,transparent 49px,rgba(26,74,26,0.15) 50px)"
+        }} />
+      )}
+
+      {/* EQUATOR LINE */}
+      <div style={{ position: "absolute", top: "51.5%", left: 0, right: 0, height: "1px", borderTop: "1px dashed #1a3a1a22", pointerEvents: "none" }} />
+
+      {/* STATUS BAR */}
+      <div style={{ display: "flex", padding: "6px 12px", background: "#020a04", borderTop: "1px solid #1a3a1a", gap: 18, alignItems: "center" }}>
+        <div style={{ fontSize: 8, color: "#3a5a3a", fontFamily: "monospace" }}>
+          PINS: <span style={{ color: "#c8ffc8" }}>{pins.length}</span>
+        </div>
+        {Object.entries(PIN_TYPES).map(([type, cfg]) => {
+          const count = pins.filter(p => p.type === type).length;
+          return count > 0 ? <div key={type} style={{ fontSize: 8, fontFamily: "monospace", color: cfg.color }}>{cfg.icon} {count}</div> : null;
+        })}
+        <div style={{ flex: 1 }} />
+        <div style={{ fontSize: 8, color: "#3a5a3a", fontFamily: "monospace" }}>GLOBAL TACTICAL OVERVIEW · TOP SECRET</div>
+        <div style={{ fontSize: 8, color: "#2a4a2a", fontFamily: "monospace" }}>⚠ HOT ZONE  ── DEPLOYMENT  ⚡ LIVE MISSION</div>
+      </div>
+
+      {/* PIN HELP */}
+      <div style={{ position: "absolute", bottom: 36, left: 12, fontSize: 7, color: "#2a4a2a", fontFamily: "monospace", pointerEvents: "none" }}>ZOOM: scroll · PAN: drag · PIN: select type then click map</div>
     </div>
   );
 }
 
 /* ═══════════════════════════ NUCLEAR LAUNCH SEQUENCE ═══════════════════════ */
+
 function NuclearLaunch({ defcon, onClose, onLaunch }) {
   const [step, setStep] = useState(0);
   const [auth1, setAuth1] = useState("");
@@ -469,6 +785,10 @@ export default function GeneralHQ() {
   const [inbox, setInbox] = useState([]);
   const [activeCall, setActiveCall] = useState(null);
   const [activeContracts, setActiveContracts] = useState([]);
+  const [liveMissions, setLiveMissions] = useState([]); // Active time-sensitive missions
+  const [completedMissions, setCompletedMissions] = useState([]); // Resolved missions log
+  const [econStatus, setEconStatus] = useState({ gdp: 0, unemployment: 0, marketIndex: 100 }); // Economic indicators
+  const [activeLiveMission, setActiveLiveMission] = useState(null); // Currently focused live mission
 
   const tick = useTick(1000);
 
@@ -525,7 +845,47 @@ export default function GeneralHQ() {
     }
   }, [tick, loaded, nuclearWinter]);
 
-  // Promotion Recommendation Events
+  // Live Mission Seeder — every 45 ticks, seed a new random mission
+  useEffect(() => {
+    if (!loaded || nuclearWinter) return;
+    if (tick > 0 && tick % 45 === 0) {
+      // Only seed if < 2 active live missions
+      if (liveMissions.filter(m => !m.resolved).length >= 2) return;
+      const available = LIVE_MISSION_POOL.filter(m => !liveMissions.find(lm => lm.id === m.id));
+      if (available.length === 0) return;
+      const mission = { ...available[Math.floor(Math.random() * available.length)], timeLeft: null, resolved: false, result: null };
+      // Start timer
+      mission.timeLeft = mission.timerSeconds;
+      setLiveMissions(prev => [...prev, mission]);
+      notify(`⚡ NEW CRISIS: ${mission.title} — RESPONSE WINDOW: ${mission.timerSeconds}s`, "#e84b4b");
+    }
+  }, [tick, loaded, nuclearWinter, liveMissions]);
+
+  // Live Mission Countdown — tick timers down, apply econ damage on expiry
+  useEffect(() => {
+    if (!loaded || nuclearWinter) return;
+    setLiveMissions(prev => prev.map(m => {
+      if (m.resolved || m.timeLeft === null) return m;
+      const newTime = m.timeLeft - 1;
+      if (newTime <= 0) {
+        // Mission expired — apply economic consequences
+        const econDmg = m.econImpact;
+        setEconStatus(e => ({
+          gdp: +(e.gdp + econDmg.gdpChange).toFixed(1),
+          unemployment: +(e.unemployment + econDmg.unemploymentChange).toFixed(1),
+          marketIndex: +(e.marketIndex + econDmg.gdpChange * 8).toFixed(1),
+        }));
+        updateGeneral({ prestige: Math.max(0, (general.prestige || 60) - 12), approval: Math.max(0, (general.approval || 70) - 10) });
+        notify(`MISSION EXPIRED: ${m.title} — ${econDmg.label} — ECONOMIC DAMAGE APPLIED`, "#e84b4b");
+        setCompletedMissions(c => [{ ...m, result: "EXPIRED", completedAt: new Date().toLocaleTimeString() }, ...c]);
+        if (activeLiveMission?.id === m.id) setActiveLiveMission(null);
+        return { ...m, resolved: true, result: "EXPIRED", timeLeft: 0 };
+      }
+      return { ...m, timeLeft: newTime };
+    }));
+  }, [tick, loaded, nuclearWinter]);
+
+
   useEffect(() => {
     if (!loaded || nuclearWinter) return;
     if (tick > 0 && tick % 30 === 0 && Math.random() > 0.4) {
@@ -1020,13 +1380,20 @@ export default function GeneralHQ() {
 
                 {/* Map */}
                 <div style={{ marginBottom: 16 }}>
-                  <div style={{ fontSize: 9, color: "#3a5a3a", letterSpacing: 4, marginBottom: 8 }}>◈ GLOBAL SITUATION MAP — {(general.hotZones || HOT_ZONES).length} ACTIVE HOT ZONES</div>
-                  <SituationMap
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                    <div style={{ fontSize: 9, color: "#3a5a3a", letterSpacing: 4 }}>◈ GLOBAL TACTICAL BOARD — {(general.hotZones || HOT_ZONES).length} HOT ZONES · {liveMissions.filter(m => !m.resolved).length} ACTIVE CRISES</div>
+                    {liveMissions.filter(m => !m.resolved).length > 0 && (
+                      <div style={{ fontSize: 8, color: "#e84b4b", animation: "pulse 1s infinite", letterSpacing: 2 }}>⚡ LIVE CRISES ACTIVE — GO TO MISSIONS TAB</div>
+                    )}
+                  </div>
+                  <TacticalBoard
                     zones={general.hotZones || HOT_ZONES}
                     deployments={general.deployments || []}
+                    liveMissions={liveMissions.filter(m => !m.resolved)}
                     onZoneClick={(z) => { setSelectedZone(z); setShowDeploy(true); }}
+                    onMissionClick={(m) => { setActiveLiveMission(m); setTab("missions"); }}
                   />
-                  <div style={{ fontSize: 8, color: "#2a4a2a", marginTop: 6 }}>CLICK ANY HOT ZONE TO DEPLOY FORCES</div>
+                  <div style={{ fontSize: 8, color: "#2a4a2a", marginTop: 6 }}>CLICK ⚠ HOT ZONE TO DEPLOY · CLICK ⚡ CRISIS MARKER TO RESPOND · PLACE TACTICAL PINS USING TOOLBAR</div>
                 </div>
 
                 {/* Deployments */}
@@ -1667,51 +2034,171 @@ export default function GeneralHQ() {
               </div>
             )}
 
-            {/* ══ MISSIONS BOARD ══ */}
-            {tab === "missions" && (
-              <div style={{ animation: "fadeUp 0.3s" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-                  <div style={{ fontSize: 9, color: "#4b9ae8", letterSpacing: 4 }}>◈ OPERATIONS PLANNING BOARD — {missions.length} MISSIONS</div>
-                  <div style={{ display: "flex", gap: 8, fontSize: 8 }}>
-                    <span style={{ color: "#4caf50" }}>● ACTIVE: {missions.filter(m => m.status === "ACTIVE").length}</span>
-                    <span style={{ color: "#e8b84b" }}>● PENDING: {missions.filter(m => m.status === "PENDING").length}</span>
-                    <span style={{ color: "#4caf50" }}>● SUCCESS: {missions.filter(m => m.status === "SUCCESS").length}</span>
-                    <span style={{ color: "#e84b4b" }}>● FAILED: {missions.filter(m => m.status === "FAILED").length}</span>
+            {/* ══ LIVE CRISIS MISSIONS ══ */}
+            {tab === "missions" && (() => {
+              const active = liveMissions.filter(m => !m.resolved);
+              const resolved = completedMissions.slice(0, 6);
+              const focused = activeLiveMission && !activeLiveMission.resolved ? liveMissions.find(m => m.id === activeLiveMission.id) : active[0];
+
+              const resolveMission = (mission, option) => {
+                const eff = option.effect;
+                updateGeneral({
+                  approval: Math.max(0, Math.min(100, ap + (eff.approval || 0))),
+                  prestige: Math.max(0, Math.min(100, pres + (eff.prestige || 0))),
+                  defcon: Math.max(1, Math.min(5, def + (eff.defcon || 0))),
+                });
+                if (eff.bankChange) setBankBalance(b => b + eff.bankChange);
+                setEconStatus(e => ({ ...e, marketIndex: +(e.marketIndex + (eff.approval || 0) * 0.5).toFixed(1) }));
+                notify(`${mission.title}: ${option.label} — EXECUTED`, option.color);
+                setCompletedMissions(c => [{ ...mission, result: "RESOLVED", chosenOption: option.label, completedAt: new Date().toLocaleTimeString() }, ...c]);
+                setLiveMissions(prev => prev.map(m => m.id === mission.id ? { ...m, resolved: true, result: "RESOLVED" } : m));
+                setActiveLiveMission(null);
+              };
+
+              return (
+                <div style={{ animation: "fadeUp 0.3s" }}>
+                  {/* HEADER — ECON INDICATORS */}
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 10, marginBottom: 16 }}>
+                    <div className="panel" style={{ padding: 12, textAlign: "center", borderLeft: "3px solid #e84b4b" }}>
+                      <div style={{ fontSize: 22, color: active.length > 0 ? "#e84b4b" : "#4caf50", fontFamily: "Oswald,sans-serif" }}>{active.length}</div>
+                      <div style={{ fontSize: 8, color: "#3a5a3a", letterSpacing: 2 }}>ACTIVE CRISES</div>
+                    </div>
+                    <div className="panel" style={{ padding: 12, textAlign: "center", borderLeft: `3px solid ${econStatus.gdp < 0 ? "#e84b4b" : "#4caf50"}` }}>
+                      <div style={{ fontSize: 22, color: econStatus.gdp < 0 ? "#e84b4b" : "#4caf50", fontFamily: "Oswald,sans-serif" }}>{econStatus.gdp >= 0 ? "+" : ""}{econStatus.gdp}%</div>
+                      <div style={{ fontSize: 8, color: "#3a5a3a", letterSpacing: 2 }}>GDP DELTA</div>
+                    </div>
+                    <div className="panel" style={{ padding: 12, textAlign: "center", borderLeft: `3px solid ${econStatus.unemployment > 0 ? "#e87a4b" : "#4caf50"}` }}>
+                      <div style={{ fontSize: 22, color: econStatus.unemployment > 0 ? "#e87a4b" : "#4caf50", fontFamily: "Oswald,sans-serif" }}>+{econStatus.unemployment.toFixed(1)}%</div>
+                      <div style={{ fontSize: 8, color: "#3a5a3a", letterSpacing: 2 }}>UNEMPLOYMENT Δ</div>
+                    </div>
+                    <div className="panel" style={{ padding: 12, textAlign: "center", borderLeft: `3px solid ${econStatus.marketIndex < 100 ? "#e84b4b" : "#4caf50"}` }}>
+                      <div style={{ fontSize: 22, color: econStatus.marketIndex < 100 ? "#e84b4b" : "#4caf50", fontFamily: "Oswald,sans-serif" }}>{econStatus.marketIndex.toFixed(0)}</div>
+                      <div style={{ fontSize: 8, color: "#3a5a3a", letterSpacing: 2 }}>MARKET INDEX</div>
+                    </div>
                   </div>
-                </div>
-                {missions.length === 0 && <div style={{ fontSize: 10, color: "#5a7a5a", fontStyle: "italic", padding: 20 }}>No missions available yet. Await intelligence briefings for new operations.</div>}
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-                  {missions.map(m => (
-                    <div key={m.id} className="panel" style={{ padding: 16, borderLeft: `3px solid ${m.classification.includes("TOP") ? "#e84b4b" : m.classification === "SECRET" ? "#e8b84b" : "#4caf50"}` }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-                        <div style={{ fontSize: 11, color: "#c8ffc8", letterSpacing: 1 }}>{m.name}</div>
-                        <div style={{ fontSize: 7, color: m.classification.includes("TOP") ? "#e84b4b" : "#e8b84b", border: `1px solid ${m.classification.includes("TOP") ? "#e84b4b" : "#e8b84b"}`, padding: "1px 6px", letterSpacing: 1 }}>{m.classification}</div>
-                      </div>
-                      <div style={{ fontSize: 9, color: "#5a7a5a", marginBottom: 8, lineHeight: 1.6 }}>{m.desc}</div>
-                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 8, color: "#3a5a3a", marginBottom: 8 }}>
-                        <span>Branch: {m.branch}</span><span>Risk: <span style={{ color: m.risk === "CRITICAL" ? "#e84b4b" : m.risk === "HIGH" ? "#e8b84b" : "#4caf50" }}>{m.risk}</span></span>
-                      </div>
-                      {m.status === "ACTIVE" && (
-                        <div style={{ marginBottom: 8 }}>
-                          <div style={{ height: 4, background: "#0a1a0a", borderRadius: 2 }}>
-                            <div style={{ height: "100%", width: `${m.progress}%`, background: "linear-gradient(90deg, #2d7a2d, #4caf50)", borderRadius: 2, transition: "width 0.5s" }} />
-                          </div>
-                          <div style={{ fontSize: 7, color: "#4caf50", marginTop: 2 }}>IN PROGRESS — {m.progress}%</div>
+
+                  <div style={{ display: "grid", gridTemplateColumns: "280px 1fr", gap: 14 }}>
+                    {/* LEFT — MISSION LIST */}
+                    <div>
+                      <div style={{ fontSize: 9, color: "#e84b4b", letterSpacing: 3, marginBottom: 10 }}>ACTIVE CRISES ({active.length})</div>
+                      {active.length === 0 && (
+                        <div style={{ background: "#050d05", border: "1px solid #1a3a1a", padding: 20, textAlign: "center" }}>
+                          <div style={{ fontSize: 24, color: "#4caf50", marginBottom: 6 }}>✓</div>
+                          <div style={{ fontSize: 9, color: "#4caf50", letterSpacing: 2, marginBottom: 4 }}>ALL CRISES RESOLVED</div>
+                          <div style={{ fontSize: 8, color: "#3a5a3a" }}>New crises emerge automatically as simulation progresses. Stay vigilant.</div>
                         </div>
                       )}
-                      {m.status === "SUCCESS" && <div style={{ fontSize: 9, color: "#4caf50", marginBottom: 6 }}>✓ MISSION ACCOMPLISHED — +{m.reward.prestige} PR, +{m.reward.approval} AP</div>}
-                      {m.status === "FAILED" && <div style={{ fontSize: 9, color: "#e84b4b", marginBottom: 6 }}>✗ MISSION FAILED — {m.penalty.prestige} PR, {m.penalty.approval} AP</div>}
-                      {m.status === "PENDING" && (
-                        <div style={{ display: "flex", gap: 6 }}>
-                          <button className="btn btn-gold" style={{ flex: 1, fontSize: 9 }} onClick={() => setMissions(ms => ms.map(x => x.id === m.id ? { ...x, status: "ACTIVE" } : x))}>⚡ AUTHORIZE</button>
-                          <button className="btn btn-red" style={{ flex: 1, fontSize: 9 }} onClick={() => setMissions(ms => ms.filter(x => x.id !== m.id))}>✗ REJECT</button>
+                      {active.map(m => {
+                        const pct = (m.timeLeft / m.timerSeconds) * 100;
+                        const isSelected = focused?.id === m.id;
+                        const timeColor = pct > 50 ? "#4caf50" : pct > 25 ? "#e8b84b" : "#e84b4b";
+                        return (
+                          <div key={m.id} onClick={() => setActiveLiveMission(m)}
+                            style={{ cursor: "pointer", background: isSelected ? "#0d1a0d" : "#050d05", border: `1px solid ${isSelected ? "#4caf50" : "#1a2a1a"}`, borderLeft: `3px solid ${timeColor}`, padding: "12px 14px", marginBottom: 8, transition: "all 0.2s" }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                              <div style={{ fontSize: 9, color: "#c8ffc8", letterSpacing: 1 }}>{m.title.replace("OPERATION ", "OP. ")}</div>
+                              <div style={{ fontSize: 14, fontFamily: "Oswald,sans-serif", color: timeColor, minWidth: 36, textAlign: "right" }}>{m.timeLeft}s</div>
+                            </div>
+                            <div style={{ fontSize: 7, color: "#5a7a5a", marginBottom: 6 }}>{m.theater} · {m.classification}</div>
+                            <div style={{ height: 2, background: "#0a1a0a" }}>
+                              <div style={{ height: "100%", width: `${pct}%`, background: timeColor, transition: "width 1s linear" }} />
+                            </div>
+                            <div style={{ fontSize: 7, color: m.econImpact.severity === "EXTINCTION" ? "#e84b4b" : "#e87a4b", marginTop: 4 }}>{m.econImpact.label}</div>
+                          </div>
+                        );
+                      })}
+
+                      {/* RESOLVED LOG */}
+                      {resolved.length > 0 && (
+                        <div style={{ marginTop: 16 }}>
+                          <div style={{ fontSize: 9, color: "#3a5a3a", letterSpacing: 2, marginBottom: 8 }}>RESOLVED ({completedMissions.length})</div>
+                          {resolved.map((m, i) => (
+                            <div key={i} style={{ padding: "8px 10px", borderLeft: `2px solid ${m.result === "EXPIRED" ? "#e84b4b" : "#4caf50"}`, background: "#040c04", marginBottom: 6 }}>
+                              <div style={{ fontSize: 8, color: m.result === "EXPIRED" ? "#e84b4b" : "#4caf50" }}>{m.result === "EXPIRED" ? "✗ EXPIRED" : "✓ RESOLVED"}</div>
+                              <div style={{ fontSize: 8, color: "#7a9a7a" }}>{m.title.replace("OPERATION ", "OP. ")}</div>
+                              {m.chosenOption && <div style={{ fontSize: 7, color: "#3a5a3a" }}>{m.chosenOption}</div>}
+                            </div>
+                          ))}
                         </div>
                       )}
                     </div>
-                  ))}
+
+                    {/* RIGHT — MISSION DETAIL */}
+                    {focused ? (
+                      <div>
+                        {/* Urgency / Title */}
+                        <div style={{ background: "#080000", border: "1px solid #3a1a1a", padding: "8px 16px", display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                          <div>
+                            <div style={{ fontSize: 8, color: "#e84b4b", letterSpacing: 3 }}>⚡ {focused.urgency} — {focused.classification}</div>
+                            <div style={{ fontSize: 16, color: "#c8ffc8", fontFamily: "Oswald,sans-serif", letterSpacing: 3, marginTop: 2 }}>{focused.title}</div>
+                          </div>
+                          <div style={{ textAlign: "center" }}>
+                            <div style={{ fontSize: 44, fontFamily: "Oswald,sans-serif", color: (focused.timeLeft / focused.timerSeconds) > 0.25 ? "#e8b84b" : "#e84b4b", lineHeight: 1, animation: focused.timeLeft < 30 ? "pulse 0.5s infinite" : undefined }}>{focused.timeLeft}</div>
+                            <div style={{ fontSize: 7, color: "#5a3a3a", letterSpacing: 2 }}>SECONDS REMAINING</div>
+                          </div>
+                        </div>
+
+                        {/* Economic Consequence Warning */}
+                        <div style={{ background: "#0a0500", border: "1px solid #3a1a00", padding: "8px 16px", marginBottom: 12 }}>
+                          <div style={{ fontSize: 8, color: focused.econImpact.severity === "EXTINCTION" ? "#e84b4b" : "#e87a4b", letterSpacing: 2, marginBottom: 2 }}>
+                            ⚠ ECONOMIC CONSEQUENCE (IF MISSION EXPIRES):
+                          </div>
+                          <div style={{ fontSize: 11, color: "#e87a4b" }}>{focused.econImpact.label}</div>
+                          <div style={{ fontSize: 8, color: "#5a3a3a" }}>GDP: {focused.econImpact.gdpChange}% · Unemployment: +{focused.econImpact.unemploymentChange}% · Severity: <span style={{ color: focused.econImpact.severity === "EXTINCTION" ? "#e84b4b" : "#e87a4b" }}>{focused.econImpact.severity}</span></div>
+                        </div>
+
+                        {/* Situation Brief */}
+                        <div className="panel" style={{ padding: 16, marginBottom: 14 }}>
+                          <div style={{ fontSize: 8, color: "#4b9ae8", letterSpacing: 3, marginBottom: 8 }}>SITUATION BRIEF · {focused.theater.toUpperCase()}</div>
+                          <div style={{ fontSize: 10, color: "#8aaa7a", lineHeight: 1.9 }}>{focused.situation}</div>
+                        </div>
+
+                        {/* Action Options — all inline, no popup */}
+                        <div style={{ fontSize: 9, color: "#e8b84b", letterSpacing: 3, marginBottom: 10 }}>SELECT COURSE OF ACTION:</div>
+                        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                          {focused.options.map((opt, i) => (
+                            <div key={i} onClick={() => resolveMission(focused, opt)}
+                              style={{ cursor: "pointer", background: "#050d05", border: `1px solid ${opt.color}22`, borderLeft: `3px solid ${opt.color}`, padding: 16, transition: "all 0.2s" }}
+                              onMouseEnter={e => { e.currentTarget.style.background = "#0a1a0a"; e.currentTarget.style.borderColor = opt.color + "66"; }}
+                              onMouseLeave={e => { e.currentTarget.style.background = "#050d05"; e.currentTarget.style.borderColor = opt.color + "22"; }}>
+                              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 6 }}>
+                                <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                                  <div style={{ fontSize: 20 }}>{opt.icon}</div>
+                                  <div>
+                                    <div style={{ fontSize: 11, color: opt.color, letterSpacing: 2 }}>{opt.label}</div>
+                                    <div style={{ fontSize: 8, color: "#5a7a5a", marginTop: 2 }}>RISK LEVEL: <span style={{ color: opt.risk === "WAR" || opt.risk === "EXTREME" ? "#e84b4b" : opt.risk === "HIGH" ? "#e87a4b" : "#4caf50" }}>{opt.risk}</span></div>
+                                  </div>
+                                </div>
+                                <div style={{ display: "flex", gap: 8, fontSize: 8 }}>
+                                  {opt.effect.approval !== 0 && <div style={{ color: opt.effect.approval > 0 ? "#4caf50" : "#e84b4b" }}>AP {opt.effect.approval > 0 ? "+" : ""}{opt.effect.approval}</div>}
+                                  {opt.effect.prestige !== 0 && <div style={{ color: opt.effect.prestige > 0 ? "#4b9ae8" : "#e84b4b" }}>PR {opt.effect.prestige > 0 ? "+" : ""}{opt.effect.prestige}</div>}
+                                  {opt.effect.defcon !== 0 && <div style={{ color: "#e8b84b" }}>DEFCON {opt.effect.defcon < 0 ? "↑" : "↓"}</div>}
+                                  {opt.effect.bankChange > 0 && <div style={{ color: "#ffd700" }}>+${(opt.effect.bankChange / 1000).toFixed(0)}K</div>}
+                                </div>
+                              </div>
+                              <div style={{ fontSize: 9, color: "#5a7a5a", lineHeight: 1.7, fontStyle: "italic" }}>"{opt.outcome.slice(0, 140)}..."</div>
+                              <div style={{ marginTop: 8, textAlign: "right" }}>
+                                <div style={{ display: "inline-block", fontSize: 8, color: opt.color, border: `1px solid ${opt.color}`, padding: "3px 14px", letterSpacing: 2 }}>► EXECUTE ORDER</div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ) : (
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: 300, border: "1px solid #1a3a1a", background: "#030c03" }}>
+                        <div style={{ textAlign: "center", color: "#3a5a3a" }}>
+                          <div style={{ fontSize: 32, marginBottom: 10 }}>⌛</div>
+                          <div style={{ fontSize: 10, letterSpacing: 3 }}>AWAITING CRISIS EVENTS</div>
+                          <div style={{ fontSize: 8, marginTop: 6, color: "#2a4a2a" }}>Crises spawn automatically as the simulation progresses</div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            )}
+              );
+            })()}
+
+
 
             {/* ══ STATE THREATS ══ */}
             {tab === "threats" && (
