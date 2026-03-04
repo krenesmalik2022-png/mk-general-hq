@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import { ComposableMap, Geographies, Geography, Marker, Line } from "react-simple-maps";
 
-/* ═══════════════════════════ PERSISTENT STORAGE ═══════════════════════════ */
+const geoUrl = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json";
 const SAVE_KEY = "specops-general-v1";
 async function loadSave() {
   try { const r = await window.storage.get(SAVE_KEY); return r ? JSON.parse(r.value) : null; } catch { return null; }
@@ -182,62 +183,77 @@ function DefconDisplay({ defcon }) {
 /* ═══════════════════════════ SITUATION MAP ══════════════════════════════════ */
 function SituationMap({ zones, deployments, onZoneClick }) {
   const [hovered, setHovered] = useState(null);
-  // Convert lat/lon to SVG x/y (rough mercator)
-  const toXY = (lat, lon) => ({ x: ((lon + 180) / 360) * 800, y: ((90 - lat) / 180) * 400 });
   return (
     <div style={{ position: "relative", border: "1px solid #2a2a00", background: "#020a02", overflow: "hidden" }}>
-      <svg viewBox="0 0 800 400" style={{ width: "100%", display: "block" }}>
-        <rect width="800" height="400" fill="#020a02" />
-        {/* Grid */}
-        {Array.from({ length: 9 }).map((_, i) => <line key={"h" + i} x1="0" y1={i * 50} x2="800" y2={i * 50} stroke="#0d1a0d" strokeWidth="0.5" />)}
-        {Array.from({ length: 17 }).map((_, i) => <line key={"v" + i} x1={i * 50} y1="0" x2={i * 50} y2="400" stroke="#0d1a0d" strokeWidth="0.5" />)}
-        {/* Equator */}
-        <line x1="0" y1="200" x2="800" y2="200" stroke="#1a3a1a" strokeWidth="1" strokeDasharray="4,4" />
-        {/* Continents - simplified */}
-        <path d="M60,80 L200,70 L240,100 L260,160 L220,210 L160,230 L100,210 L70,170 Z" fill="#0a1a0a" stroke="#1a3a1a" strokeWidth="1" />
-        <path d="M140,240 L230,230 L255,280 L245,360 L200,385 L165,370 L145,320 Z" fill="#0a1a0a" stroke="#1a3a1a" strokeWidth="1" />
-        <path d="M350,50 L460,42 L490,75 L470,110 L420,120 L370,100 Z" fill="#0a1a0a" stroke="#1a3a1a" strokeWidth="1" />
-        <path d="M370,125 L460,115 L480,160 L470,260 L435,300 L395,290 L365,255 L355,190 Z" fill="#0a1a0a" stroke="#1a3a1a" strokeWidth="1" />
-        <path d="M460,38 L660,32 L700,70 L680,130 L610,165 L540,160 L480,120 Z" fill="#0a1a0a" stroke="#1a3a1a" strokeWidth="1" />
-        <path d="M450,125 L530,112 L555,155 L525,175 L465,165 Z" fill="#0a1a0a" stroke="#1a3a1a" strokeWidth="1" />
-        <path d="M620,88 L700,80 L720,120 L690,145 L630,135 Z" fill="#0a1a0a" stroke="#1a3a1a" strokeWidth="1" />
-        <path d="M575,270 L670,258 L710,300 L700,340 L655,355 L600,340 Z" fill="#0a1a0a" stroke="#1a3a1a" strokeWidth="1" />
+      <ComposableMap projection="geoMercator" projectionConfig={{ scale: 120 }} width={800} height={400} style={{ width: "100%", display: "block" }}>
 
-        {/* Deployment lines */}
-        {deployments.map((dep, i) => {
-          const from = toXY(0, 0);
-          const to = toXY(dep.lat, dep.lon);
-          return <line key={i} x1={400} y1={200} x2={to.x} y2={to.y} stroke={dep.color || "#4caf5044"} strokeWidth="1" strokeDasharray="3,3" opacity="0.6" />;
-        })}
+        <Geographies geography={geoUrl}>
+          {({ geographies }) =>
+            geographies.map((geo) => (
+              <Geography
+                key={geo.rsmKey}
+                geography={geo}
+                fill="#0a1a0a"
+                stroke="#1a3a1a"
+                strokeWidth={0.5}
+                style={{
+                  default: { outline: "none" },
+                  hover: { fill: "#0f1f0f", outline: "none" },
+                  pressed: { outline: "none" },
+                }}
+              />
+            ))
+          }
+        </Geographies>
 
-        {/* Hot zones */}
+        {deployments.map((dep, i) => (
+          <Line
+            key={i}
+            from={[-77.0369, 38.9072]}
+            to={[dep.lon, dep.lat]}
+            stroke={dep.color || "#4caf5044"}
+            strokeWidth={1}
+            strokeDasharray="3,3"
+            opacity={0.6}
+            style={{ pointerEvents: "none" }}
+          />
+        ))}
+
         {zones.map(z => {
-          const { x, y } = toXY(z.lat, z.lon);
           const isH = hovered === z.id;
           return (
-            <g key={z.id} onClick={() => onZoneClick(z)} onMouseEnter={() => setHovered(z.id)} onMouseLeave={() => setHovered(null)} style={{ cursor: "pointer" }}>
-              <circle cx={x} cy={y} r="14" fill="none" stroke={z.color} strokeWidth="1" opacity="0.3">
+            <Marker
+              key={z.id}
+              coordinates={[z.lon, z.lat]}
+              onClick={() => onZoneClick(z)}
+              onMouseEnter={() => setHovered(z.id)}
+              onMouseLeave={() => setHovered(null)}
+              style={{ cursor: "pointer" }}
+            >
+              <circle r="14" fill="none" stroke={z.color} strokeWidth="1" opacity="0.3">
                 <animate attributeName="r" values="10;20;10" dur="2.5s" repeatCount="indefinite" />
                 <animate attributeName="opacity" values="0.4;0;0.4" dur="2.5s" repeatCount="indefinite" />
               </circle>
-              <circle cx={x} cy={y} r={isH ? 9 : 7} fill={z.color + "33"} stroke={z.color} strokeWidth={isH ? 2 : 1} style={{ transition: "all 0.2s" }} />
-              <text x={x} y={y + 4} textAnchor="middle" fontSize="7" fill={z.color} fontFamily="monospace">⚠</text>
-              <text x={x} y={y + 22} textAnchor="middle" fontSize="7.5" fill={isH ? "#c8ffc8" : z.color + "cc"} fontFamily="monospace">{z.name}</text>
+              <circle r={isH ? 9 : 7} fill={z.color + "33"} stroke={z.color} strokeWidth={isH ? 2 : 1} style={{ transition: "all 0.2s" }} />
+              <text y={4} textAnchor="middle" fontSize="7" fill={z.color} fontFamily="monospace">⚠</text>
+              <text y={22} textAnchor="middle" fontSize="7.5" fill={isH ? "#c8ffc8" : z.color + "cc"} fontFamily="monospace">{z.name}</text>
               {isH && (
                 <g>
-                  <rect x={x - 70} y={y + 26} width="140" height="28" fill="#050d05" stroke={z.color} strokeWidth="1" rx="1" />
-                  <text x={x} y={y + 38} textAnchor="middle" fontSize="7" fill="#c8c870" fontFamily="monospace">{z.threat} THREAT</text>
-                  <text x={x} y={y + 50} textAnchor="middle" fontSize="6.5" fill="#7a8a7a" fontFamily="monospace">{z.troops.toLocaleString()} troops</text>
+                  <rect x={-70} y={26} width="140" height="28" fill="#050d05" stroke={z.color} strokeWidth="1" rx="1" />
+                  <text y={38} textAnchor="middle" fontSize="7" fill="#c8c870" fontFamily="monospace">{z.threat} THREAT</text>
+                  <text y={50} textAnchor="middle" fontSize="6.5" fill="#7a8a7a" fontFamily="monospace">{z.troops.toLocaleString()} troops</text>
                 </g>
               )}
-            </g>
+            </Marker>
           );
         })}
+      </ComposableMap>
 
-        {/* Legend */}
-        <text x="10" y="390" fontSize="7" fill="#3a5a3a" fontFamily="monospace">GLOBAL SITUATION MAP · CLASSIFICATION: TOP SECRET</text>
-        <text x="790" y="390" textAnchor="end" fontSize="7" fill="#3a5a3a" fontFamily="monospace">⚠ HOT ZONE  ── DEPLOYMENT</text>
-      </svg>
+      {/* Grid and Overlays */}
+      <div style={{ position: "absolute", inset: 0, pointerEvents: "none", background: "repeating-linear-gradient(0deg, transparent, transparent 49px, rgba(13,26,13,0.3) 50px), repeating-linear-gradient(90deg, transparent, transparent 49px, rgba(13,26,13,0.3) 50px)" }} />
+      <div style={{ position: "absolute", top: "50%", left: 0, right: 0, height: "1px", borderTop: "1px dashed #1a3a1a", pointerEvents: "none" }} />
+      <div style={{ position: "absolute", bottom: 10, left: 10, fontSize: "10px", color: "#3a5a3a", fontFamily: "monospace", pointerEvents: "none" }}>GLOBAL SITUATION MAP · CLASSIFICATION: TOP SECRET</div>
+      <div style={{ position: "absolute", bottom: 10, right: 10, fontSize: "10px", color: "#3a5a3a", fontFamily: "monospace", pointerEvents: "none" }}>⚠ HOT ZONE  ── DEPLOYMENT</div>
     </div>
   );
 }
@@ -420,6 +436,14 @@ export default function GeneralHQ() {
     alliedNations: 18, activeTheatres: 4, medalsAwarded: 0,
     hotZones: HOT_ZONES, deployments: [], eventLog: [],
     awardedTo: {}, coupStatus: "none", presidentialMeetings: 0,
+    ownsPMC: false, pmcStats: { name: "Aegis Default", rep: 0, funds: 0 },
+    personnelRoster: [
+      { id: "p1", name: "Sgt. 1st Class Miller", rank: "E-7", unit: "Delta Force", status: "ACTIVE" },
+      { id: "p2", name: "Staff Sgt. Hernandez", rank: "E-6", unit: "75th Rangers", status: "ACTIVE" },
+      { id: "p3", name: "Corp. Jackson", rank: "E-4", unit: "1st Marine Div", status: "ACTIVE" },
+      { id: "p4", name: "Pvt. Vance", rank: "E-1", unit: "82nd Airborne", status: "DEPLOYED" },
+      { id: "p5", name: "Master Sgt. Dubois", rank: "E-8", unit: "5th Special Forces", status: "ACTIVE" }
+    ],
   });
   const [activeEvent, setActiveEvent] = useState(null);
   const [showNuclear, setShowNuclear] = useState(false);
@@ -500,6 +524,31 @@ export default function GeneralHQ() {
       notify(`SECURE INBOX: New message from ${newEmail.sender}`, "#e8b84b");
     }
   }, [tick, loaded, nuclearWinter]);
+
+  // Promotion Recommendation Events
+  useEffect(() => {
+    if (!loaded || nuclearWinter) return;
+    if (tick > 0 && tick % 30 === 0 && Math.random() > 0.4) {
+      const pRoster = general.personnelRoster || [];
+      if (pRoster.length === 0) return;
+
+      const soldier = pRoster[Math.floor(Math.random() * pRoster.length)];
+      const officer = SUBORDINATE_GENERALS[Math.floor(Math.random() * SUBORDINATE_GENERALS.length)];
+
+      const newEmail = {
+        id: Date.now(),
+        sender: officer.name,
+        subject: `Recommendation: Field Promotion for ${soldier.name}`,
+        body: `General, I formally recommend ${soldier.rank} ${soldier.name} of ${soldier.unit} for immediate promotion. Their recent conduct in the field has been exemplary. Proceeding with this will cost you some political capital (Prestige) but will significantly boost unit morale and our overall approval rating. Awaiting your authorization.`,
+        actionType: "PROMOTE", soldierId: soldier.id, soldierName: soldier.name, costPR: 5, gainAP: 8,
+        read: false,
+        time: new Date().toLocaleTimeString()
+      };
+
+      setInbox(prev => [newEmail, ...prev].slice(0, 15));
+      notify(`SECURE INBOX: Promotion recommendation from ${officer.name}`, "#e8b84b");
+    }
+  }, [tick, loaded, nuclearWinter, general.personnelRoster]);
 
   // Random Hero Events
   useEffect(() => {
@@ -972,7 +1021,11 @@ export default function GeneralHQ() {
                 {/* Map */}
                 <div style={{ marginBottom: 16 }}>
                   <div style={{ fontSize: 9, color: "#3a5a3a", letterSpacing: 4, marginBottom: 8 }}>◈ GLOBAL SITUATION MAP — {(general.hotZones || HOT_ZONES).length} ACTIVE HOT ZONES</div>
-                  <SituationMap zones={general.hotZones || HOT_ZONES} deployments={general.deployments || []} onZoneClick={z => { setSelectedZone(z); setShowDeploy(true); }} />
+                  <SituationMap
+                    zones={general.hotZones || HOT_ZONES}
+                    deployments={general.deployments || []}
+                    onZoneClick={(z) => { setSelectedZone(z); setShowDeploy(true); }}
+                  />
                   <div style={{ fontSize: 8, color: "#2a4a2a", marginTop: 6 }}>CLICK ANY HOT ZONE TO DEPLOY FORCES</div>
                 </div>
 
@@ -1893,9 +1946,27 @@ export default function GeneralHQ() {
                         <div style={{ fontSize: 11, color: "#8a9a8a", lineHeight: 1.8, marginBottom: 40, whiteSpace: "pre-wrap" }}>{activeCall.body}</div>
 
                         <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                          <button className="btn" style={{ flex: 1, borderColor: "#4caf50", color: "#4caf50", minWidth: 160 }} onClick={() => { updateGeneral({ prestige: Math.min(100, (general.prestige || 60) + 3), approval: Math.min(100, (general.approval || 70) + 2) }); notify(`Greenlit. ${activeCall.sender} acknowledged. +3 PR, +2 AP`, "#4caf50"); setActiveCall(null); }}>⚡ GREENLIGHT (+3 PR, +2 AP)</button>
-                          <button className="btn btn-gold" style={{ flex: 1, minWidth: 160 }} onClick={() => { notify(`Forwarded to backchannel. Deniability maintained.`, "#e8b84b"); setActiveCall(null); }}>↗ REROUTE TO BACKCHANNEL</button>
-                          <button className="btn btn-red" style={{ flex: 1, minWidth: 160 }} onClick={() => { updateGeneral({ approval: Math.min(100, (general.approval || 70) + 1) }); notify(`Request denied. Message purged from system.`, "#e84b4b"); setActiveCall(null); setInbox(prev => prev.filter(m => m.id !== activeCall.id)); }}>🗑 DENY & PURGE (+1 AP)</button>
+                          {activeCall.actionType === "PROMOTE" ? (
+                            <>
+                              <button className="btn" style={{ flex: 1, borderColor: "#ffd700", color: "#ffd700" }} onClick={() => {
+                                updateGeneral({
+                                  prestige: Math.max(0, pres - activeCall.costPR),
+                                  approval: Math.min(100, ap + activeCall.gainAP),
+                                  personnelRoster: (general.personnelRoster || []).map(p => p.id === activeCall.soldierId ? { ...p, rank: p.rank + "+" } : p)
+                                });
+                                notify(`${activeCall.soldierName} Promoted! (-${activeCall.costPR} PR, +${activeCall.gainAP} AP)`, "#ffd700");
+                                setActiveCall(null);
+                                setInbox(prev => prev.filter(m => m.id !== activeCall.id));
+                              }}>🎖 PROMOTE (-{activeCall.costPR} PR, +{activeCall.gainAP} AP)</button>
+                              <button className="btn btn-red" style={{ flex: 1 }} onClick={() => { notify("Promotion Denied", "#e84b4b"); setActiveCall(null); setInbox(prev => prev.filter(m => m.id !== activeCall.id)); }}>REJECT</button>
+                            </>
+                          ) : (
+                            <>
+                              <button className="btn" style={{ flex: 1, borderColor: "#4caf50", color: "#4caf50", minWidth: 160 }} onClick={() => { updateGeneral({ prestige: Math.min(100, (general.prestige || 60) + 3), approval: Math.min(100, (general.approval || 70) + 2) }); notify(`Greenlit. ${activeCall.sender} acknowledged. +3 PR, +2 AP`, "#4caf50"); setActiveCall(null); }}>⚡ GREENLIGHT (+3 PR, +2 AP)</button>
+                              <button className="btn btn-gold" style={{ flex: 1, minWidth: 160 }} onClick={() => { notify(`Forwarded to backchannel. Deniability maintained.`, "#e8b84b"); setActiveCall(null); }}>↗ REROUTE TO BACKCHANNEL</button>
+                              <button className="btn btn-red" style={{ flex: 1, minWidth: 160 }} onClick={() => { updateGeneral({ approval: Math.min(100, (general.approval || 70) + 1) }); notify(`Request denied. Message purged from system.`, "#e84b4b"); setActiveCall(null); setInbox(prev => prev.filter(m => m.id !== activeCall.id)); }}>🗑 DENY & PURGE (+1 AP)</button>
+                            </>
+                          )}
                         </div>
                       </div>
                     ) : (
