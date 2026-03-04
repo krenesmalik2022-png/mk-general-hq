@@ -2239,7 +2239,7 @@ export default function GeneralHQ() {
               const resolved = completedMissions.slice(0, 6);
               const focused = activeLiveMission && !activeLiveMission.resolved ? liveMissions.find(m => m.id === activeLiveMission.id) : active[0];
 
-              const resolveMission = (mission, option) => {
+              const resolveMission = (mission, option, officerId = null) => {
                 const eff = option.effect;
                 updateGeneral({
                   approval: Math.max(0, Math.min(100, ap + (eff.approval || 0))),
@@ -2248,7 +2248,20 @@ export default function GeneralHQ() {
                 });
                 if (eff.bankChange) setBankBalance(b => b + eff.bankChange);
                 setEconStatus(e => ({ ...e, marketIndex: +(e.marketIndex + (eff.approval || 0) * 0.5).toFixed(1) }));
-                notify(`${mission.title}: ${option.label} — EXECUTED`, option.color);
+
+                // Officer XP Logic
+                let officerMsg = "";
+                if (officerId) {
+                  const xpGain = option.risk === "EXTREME" || option.risk === "WAR" ? 800 : option.risk === "HIGH" ? 450 : 250;
+                  setOfficerRoster(prev => prev.map(o => {
+                    if (o.id === officerId) return { ...o, xp: o.xp + xpGain };
+                    return o;
+                  }));
+                  const officer = officerRoster.find(o => o.id === officerId);
+                  if (officer) officerMsg = ` — ${officer.rank} ${officer.name} gained ${xpGain} XP.`;
+                }
+
+                notify(`${mission.title}: ${option.label} — EXECUTED${officerMsg}`, option.color);
                 setCompletedMissions(c => [{ ...mission, result: "RESOLVED", chosenOption: option.label, completedAt: new Date().toLocaleTimeString() }, ...c]);
                 setLiveMissions(prev => prev.map(m => m.id === mission.id ? { ...m, resolved: true, result: "RESOLVED" } : m));
                 setActiveLiveMission(null);
@@ -2352,12 +2365,29 @@ export default function GeneralHQ() {
                           <div style={{ fontSize: 10, color: "#8aaa7a", lineHeight: 1.9 }}>{focused.situation}</div>
                         </div>
 
-                        {/* Action Options — all inline, no popup */}
+                        {/* Action Options */}
                         <div style={{ fontSize: 9, color: "#e8b84b", letterSpacing: 3, marginBottom: 10 }}>SELECT COURSE OF ACTION:</div>
+
+                        {/* Assignment dropdown for Live Missions */}
+                        <div style={{ marginBottom: 16, background: "#050a05", padding: "10px 14px", border: "1px solid #1a2a1a" }}>
+                          <div style={{ fontSize: 8, color: "#c8b870", letterSpacing: 2, marginBottom: 8 }}>ASSIGN COMMANDING OFFICER (OPTIONAL)</div>
+                          <select
+                            id="officer-select-mission"
+                            className="fikra-input"
+                            style={{ width: "100%", padding: "8px", fontSize: 10, background: "#000", border: "1px solid #2a3a2a", color: "#c8ffc8", outline: "none" }}
+                          >
+                            <option value="">NO OFFICER ASSIGNED (GENERAL DIRECT COMMAND)</option>
+                            {officerRoster.filter(o => o.status === "ACTIVE").map(o => (
+                              <option key={o.id} value={o.id}>{o.rank} {o.name.toUpperCase()} — {o.unit} ({o.specialty})</option>
+                            ))}
+                          </select>
+                          <div style={{ fontSize: 7, color: "#5a7a5a", marginTop: 6 }}>Assigning an officer grants them Combat Experience (XP) upon successful mission resolution, allowing for future promotion.</div>
+                        </div>
+
                         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                           {focused.options.map((opt, i) => (
                             <div key={i} onClick={() => {
-                              const officerId = document.getElementById("officer-select")?.value || null;
+                              const officerId = document.getElementById("officer-select-mission")?.value || null;
                               resolveMission(focused, opt, officerId);
                             }}
                               style={{ cursor: "pointer", background: "#050d05", border: `1px solid ${opt.color}22`, borderLeft: `3px solid ${opt.color}`, padding: 16, transition: "all 0.2s" }}
