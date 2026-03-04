@@ -261,6 +261,30 @@ const SUBORDINATE_GENERALS = [
   { id: "sg5", name: "Col. Dmitri Volkov", rank: "COL", unit: "Delta Force", distinction: "Born in USSR. Defected 1991. CIA asset.", medals: ["CAB", "BSM", "PH"] },
 ];
 
+const INITIAL_OFFICERS = [
+  { id: "o1", name: "Anderson, C.", rank: "1LT", unit: "75th Ranger Reg.", specialty: "Direct Action", xp: 120, status: "ACTIVE" },
+  { id: "o2", name: "Miller, D.", rank: "CPT", unit: "SEAL Team 6", specialty: "Maritime", xp: 650, status: "ACTIVE" },
+  { id: "o3", name: "Chen, J.", rank: "MAJ", unit: "Delta Force", specialty: "Hostage Rescue", xp: 1400, status: "ACTIVE" },
+  { id: "o4", name: "Reyes, M.", rank: "CPT", unit: "Night Stalkers", specialty: "Aviation", xp: 800, status: "ACTIVE" },
+  { id: "o5", name: "Washington, T.", rank: "LTC", unit: "ISA", specialty: "Intelligence", xp: 2800, status: "ACTIVE" }
+];
+
+const PROMOTION_THRESHOLDS = {
+  "1LT": { next: "CPT", xpReq: 500, cost: 5 },
+  "CPT": { next: "MAJ", xpReq: 1200, cost: 10 },
+  "MAJ": { next: "LTC", xpReq: 2500, cost: 15 },
+  "LTC": { next: "COL", xpReq: 5000, cost: 25 },
+  "COL": { next: "BG", xpReq: 10000, cost: 50 },
+};
+
+const DIVISION_UPGRADES = [
+  { id: "upg1", name: "GPNVG-18 PANO VISION", desc: "4-tube night vision giving 97° FoV room clearing advantage. +10% Success Rate.", cost: 1200000 },
+  { id: "upg2", name: "LOITERING DRONES (SWITCHBLADE 600)", desc: "Backpack-carried kamikaze drones for platoon-level anti-armor. -15% KIA Risk.", cost: 3500000 },
+  { id: "upg3", name: "NEXT-GEN SQUAD WEAPON (SIG MCX SPEAR)", desc: "6.8mm rifle that penetrates modern body armor at 500m. +20% Combat Effectiveness.", cost: 5000000 },
+  { id: "upg4", name: "EXOSKELETON KNEE BRACES", desc: "Reduces troop fatigue by 40%. Decreases extraction times. +10 Approval.", cost: 8000000 },
+  { id: "upg5", name: "AI BATTLESPACE C2 SYSTEM", desc: "Palantir Gotham integration for real-time threat feed. +15 Prestige.", cost: 15000000 }
+];
+
 const MEDAL_LIST = [
   { id: "moh", name: "Medal of Honor", color: "#ffd700", icon: "🏅", desc: "Nation's highest military honor" },
   { id: "dsm", name: "Defense Superior Service", color: "#e8b84b", icon: "★", desc: "Exceptional meritorious service" },
@@ -781,7 +805,7 @@ export default function GeneralHQ() {
   const [missions, setMissions] = useState([]);
   const [stateThreats, setStateThreats] = useState([]);
   const [showPotus, setShowPotus] = useState(false);
-  const [blackBudget, setBlackBudget] = useState(0);
+  const [blackBudget, setBlackBudget] = useState(5000000); // Bumped starting black budget for upgrades
   const [inbox, setInbox] = useState([]);
   const [activeCall, setActiveCall] = useState(null);
   const [activeContracts, setActiveContracts] = useState([]);
@@ -789,6 +813,8 @@ export default function GeneralHQ() {
   const [completedMissions, setCompletedMissions] = useState([]); // Resolved missions log
   const [econStatus, setEconStatus] = useState({ gdp: 0, unemployment: 0, marketIndex: 100 }); // Economic indicators
   const [activeLiveMission, setActiveLiveMission] = useState(null); // Currently focused live mission
+  const [officerRoster, setOfficerRoster] = useState(INITIAL_OFFICERS);
+  const [divisionPurchases, setDivisionPurchases] = useState([]);
 
   const tick = useTick(1000);
 
@@ -1018,6 +1044,68 @@ export default function GeneralHQ() {
     setActiveEvent(null);
     notify(`EVENT RESOLVED: ${evt.title.slice(0, 30)}...`);
   }
+
+  // Officer Academy Promotion Logic
+  const promoteOfficer = (officer) => {
+    const thresh = PROMOTION_THRESHOLDS[officer.rank];
+    if (!thresh || (general.prestige || 60) < thresh.cost) {
+      notify(`INSUFFICIENT PRESTIGE — NEED ${thresh?.cost || "?"} PR`, "#e84b4b");
+      return;
+    }
+
+    updateGeneral({ prestige: (general.prestige || 60) - thresh.cost });
+
+    if (thresh.next === "BG") {
+      // Graduate to Subordinate General!
+      setOfficerRoster(prev => prev.filter(o => o.id !== officer.id));
+      const newGen = { id: `gen_${Date.now()}`, name: officer.name.split(",")[0], rank: "BG", unit: officer.unit, distinction: "Field Promoted from Academy", medals: ["Bronze Star"] };
+      SUBORDINATE_GENERALS.push(newGen); // Mutate constant list for this session
+      notify(`PROMOTION AUTHORIZED: ${officer.name} is now a Brigadier General!`, "#4caf50");
+    } else {
+      // Standard rank up
+      setOfficerRoster(prev => prev.map(o => o.id === officer.id ? { ...o, rank: thresh.next } : o));
+      notify(`PROMOTION AUTHORIZED: ${officer.name} promoted to ${thresh.next}`, "#4caf50");
+    }
+  };
+
+  const buyDivisionUpgrade = (upg) => {
+    if (blackBudget < upg.cost) {
+      notify(`INSUFFICIENT BLACK BUDGET FUNDS`, "#e84b4b");
+      return;
+    }
+    setBlackBudget(b => b - upg.cost);
+    setDivisionPurchases(prev => [...prev, upg.id]);
+    notify(`EQUIPMENT PROCURED: ${upg.name} field deployment authorized.`, "#4caf50");
+    if (upg.name.includes("EXOSKELETON")) updateGeneral({ approval: Math.min(100, (general.approval || 70) + 10) });
+    if (upg.name.includes("AI BATTLESPACE")) updateGeneral({ prestige: Math.min(100, (general.prestige || 60) + 15) });
+  };
+
+  const resolveMission = (mission, option, officerId = null) => {
+    // 1. Apply Option Effects
+    updateGeneral({
+      approval: Math.min(100, Math.max(0, (general.approval || 70) + option.effect.approval)),
+      prestige: Math.min(100, Math.max(0, (general.prestige || 60) + option.effect.prestige)),
+      defcon: Math.min(5, Math.max(1, (general.defcon || 4) + option.effect.defcon))
+    });
+    setBankBalance(b => b + option.effect.bankChange);
+
+    // 2. Grant Officer XP if assigned
+    let officerMsg = "";
+    if (officerId) {
+      const xpGain = option.risk === "EXTREME" ? 800 : option.risk === "HIGH" ? 450 : 150;
+      setOfficerRoster(prev => prev.map(o => {
+        if (o.id === officerId) return { ...o, xp: o.xp + xpGain };
+        return o;
+      }));
+      const officer = officerRoster.find(o => o.id === officerId);
+      if (officer) officerMsg = ` — ${officer.rank} ${officer.name} gained ${xpGain} XP for commanding.`;
+    }
+
+    setLiveMissions(prev => prev.filter(m => m.id !== mission.id));
+    setCompletedMissions(prev => [{ ...mission, result: "SUCCESS", chosenOption: option.label, completedAt: new Date().toLocaleTimeString() }, ...prev]);
+    setActiveLiveMission(null);
+    notify(`MISSION SUCCESS: ${mission.title} RESOLVED${officerMsg}`, "#4caf50");
+  };
 
   function deployUnit(unit, zone) {
     const newDep = { unitId: unit.id, unitName: unit.name, zoneName: zone.name, lat: zone.lat, lon: zone.lon, color: zone.color, deployed: new Date().toLocaleDateString() };
@@ -1330,11 +1418,10 @@ export default function GeneralHQ() {
               { id: "awards", label: "🏅 AWARDS" },
               { id: "politics", label: "🏛 POLITICS" },
               { id: "coup", label: "⚠ COUPS & THREATS" },
-              { id: "press", label: "📡 PRESS BRIEFING" },
               { id: "missions", label: "🎯 MISSIONS" },
               { id: "shadow", label: "🦅 SHADOW OPS" },
-              { id: "threats", label: "🚨 STATE THREATS" },
-              { id: "comms", label: "✉ SECURE COMMS" },
+              { id: "armory", label: "📦 DIVISION ARMORY" },
+              { id: "academy", label: "🎓 OFFICER ACADEMY" },
               { id: "quarters", label: "🥃 GENERAL'S QUARTERS" },
             ].map(t => (
               <button key={t.id} className={`tab-btn${tab === t.id ? " active" : ""}`} onClick={() => setTab(t.id)}>
@@ -1480,6 +1567,103 @@ export default function GeneralHQ() {
                       </div>
                     </div>
                   ))}
+                </div>
+              </div>
+            )}
+
+            {/* ══ OFFICER ACADEMY ══ */}
+            {tab === "academy" && (
+              <div style={{ animation: "fadeUp 0.3s" }}>
+                <div style={{ fontSize: 9, color: "#3a5a3a", letterSpacing: 4, marginBottom: 16 }}>◈ JUNIOR OFFICER COMMISSION / FIELD PROMOTIONS</div>
+                <div style={{ background: "#0a0a00", border: "1px solid #2a2a00", padding: "12px 16px", marginBottom: 20 }}>
+                  <div style={{ fontSize: 9, color: "#c8b870", letterSpacing: 2 }}>FIELD EXPERIENCE & PROMOTION MECHANICS</div>
+                  <div style={{ fontSize: 8, color: "#8a8a6a", marginTop: 4 }}>Assign Junior Officers to command Live Missions to earn field experience (XP). Upon reaching XP thresholds, you may spend Prestige to promote them. Officers reaching Brigadier General (BG) are transferred to the Subordinate Commanders roster.</div>
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 12 }}>
+                  {officerRoster.map(o => {
+                    const thresh = PROMOTION_THRESHOLDS[o.rank];
+                    const maxRank = !thresh;
+                    const canPromote = !maxRank && o.xp >= thresh.xpReq;
+                    const pct = maxRank ? 100 : Math.min(100, (o.xp / thresh.xpReq) * 100);
+
+                    return (
+                      <div key={o.id} className="panel" style={{ padding: 16, borderLeft: `3px solid ${canPromote ? "#4caf50" : "#2a4a2a"}`, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
+                          <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+                            <div style={{ width: 44, height: 44, border: "1px solid #1a3a1a", background: "#000", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, color: "#c8ffc8", fontFamily: "Oswald,sans-serif" }}>{o.rank}</div>
+                            <div>
+                              <div style={{ fontSize: 13, color: "#c8ffc8", letterSpacing: 2 }}>{o.name.toUpperCase()}</div>
+                              <div style={{ fontSize: 8, color: "#5a7a5a" }}>{o.unit} · {o.specialty}</div>
+                            </div>
+                          </div>
+                          <div style={{ fontSize: 8, background: "#050a05", padding: "2px 6px", border: "1px solid #1a2a1a", color: "#4caf50" }}>{o.status}</div>
+                        </div>
+
+                        <div style={{ marginBottom: 16 }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 8, color: "#4a6a4a", marginBottom: 4 }}>
+                            <span>COMBAT EXPERIENCE</span>
+                            <span>{o.xp.toLocaleString()} {thresh ? `/ ${thresh.xpReq.toLocaleString()} XP` : 'MAX'}</span>
+                          </div>
+                          <div style={{ height: 4, background: "#0a1a0a", borderRadius: 2 }}>
+                            <div style={{ height: "100%", width: `${pct}%`, background: canPromote ? "#4caf50" : "#2a5a2a", transition: "width 0.5s" }} />
+                          </div>
+                        </div>
+
+                        {!maxRank && (
+                          <button
+                            className={`btn ${canPromote ? "btn-green" : ""}`}
+                            style={{ fontSize: 9, padding: "8px", width: "100%", opacity: canPromote ? 1 : 0.4, cursor: canPromote ? "pointer" : "not-allowed" }}
+                            onClick={() => canPromote && promoteOfficer(o)}
+                          >
+                            {canPromote ? `⭐ PROMOTE TO ${thresh.next} (COST: ${thresh.cost} PR)` : `DEPLOY ON MISSIONS TO PROMOTE`}
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* ══ DIVISION ARMORY ══ */}
+            {tab === "armory" && (
+              <div style={{ animation: "fadeUp 0.3s" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 16 }}>
+                  <div style={{ fontSize: 9, color: "#3a5a3a", letterSpacing: 4 }}>◈ DIVISION ARMORY / BLACK BUDGET PROCUREMENT</div>
+                  <div style={{ textAlign: "right" }}>
+                    <div style={{ fontSize: 18, color: "#c8ffc8", fontFamily: "Oswald,sans-serif" }}>${(blackBudget / 1000000).toFixed(1)}M</div>
+                    <div style={{ fontSize: 8, color: "#5a7a5a", letterSpacing: 1 }}>AVAILABLE BLACK BUDGET</div>
+                  </div>
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+                  {DIVISION_UPGRADES.map(upg => {
+                    const owned = divisionPurchases.includes(upg.id);
+                    const canAfford = blackBudget >= upg.cost;
+
+                    return (
+                      <div key={upg.id} className="panel" style={{ padding: 18, borderLeft: `3px solid ${owned ? "#4b9ae8" : "#2a2a2a"}`, opacity: owned ? 0.7 : 1 }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                          <div style={{ fontSize: 12, color: owned ? "#4b9ae8" : "#c8ffc8", letterSpacing: 1 }}>{upg.name}</div>
+                          <div style={{ fontSize: 11, color: owned ? "#4b9ae8" : canAfford ? "#ffd700" : "#e84b4b", fontFamily: "Oswald,sans-serif" }}>
+                            {owned ? "PROCURED" : `$${(upg.cost / 1000000).toFixed(1)}M`}
+                          </div>
+                        </div>
+                        <div style={{ fontSize: 9, color: "#6a8a6a", lineHeight: 1.6, marginBottom: 14 }}>{upg.desc}</div>
+                        {!owned && (
+                          <button
+                            className="btn btn-gold"
+                            style={{ fontSize: 9, padding: "6px 12px", opacity: canAfford ? 1 : 0.4, cursor: canAfford ? "pointer" : "not-allowed" }}
+                            onClick={() => canAfford && buyDivisionUpgrade(upg)}
+                          >
+                            PROCURE FOR SOCOM
+                          </button>
+                        )}
+                        {owned && <div style={{ fontSize: 8, color: "#4b9ae8", letterSpacing: 2 }}>✓ DEPLOYED TO FIELD UNITS</div>}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -1831,12 +2015,27 @@ export default function GeneralHQ() {
                             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                               <div style={{ fontSize: 9, color: "#9b9bff", letterSpacing: 1 }}>{o.emoji} {o.label}</div>
                               <div style={{ display: "flex", gap: 6, fontSize: 8 }}>
-                                <span style={{ color: o.effect.ap > 0 ? "#4caf50" : "o.effect.ap<0" ? "#e84b4b" : "#5a5a5a" }}>AP {o.effect.ap > 0 ? "+" : ""}{o.effect.ap}</span>
+                                <span style={{ color: o.effect.ap > 0 ? "#4caf50" : o.effect.ap < 0 ? "#e84b4b" : "#5a5a5a" }}>AP {o.effect.ap > 0 ? "+" : ""}{o.effect.ap}</span>
                                 <span style={{ color: o.effect.p > 0 ? "#4caf50" : "#e84b4b" }}>PR {o.effect.p > 0 ? "+" : ""}{o.effect.p}</span>
                               </div>
                             </div>
                           </div>
                         ))}
+                        {/* Assignment dropdown */}
+                        <div style={{ marginTop: 16, background: "#050a05", padding: "10px 14px", border: "1px solid #1a2a1a" }}>
+                          <div style={{ fontSize: 8, color: "#c8b870", letterSpacing: 2, marginBottom: 8 }}>ASSIGN COMMANDING OFFICER (OPTIONAL)</div>
+                          <select
+                            id="officer-select"
+                            className="fikra-input"
+                            style={{ width: "100%", padding: "8px", fontSize: 10, background: "#000", border: "1px solid #2a3a2a", color: "#c8ffc8" }}
+                          >
+                            <option value="">NO OFFICER ASSIGNED (GENERAL DIRECT COMMAND)</option>
+                            {officerRoster.filter(o => o.status === "ACTIVE").map(o => (
+                              <option key={o.id} value={o.id}>{o.rank} {o.name.toUpperCase()} — {o.unit} ({o.specialty})</option>
+                            ))}
+                          </select>
+                          <div style={{ fontSize: 7, color: "#5a7a5a", marginTop: 6 }}>Assigning an officer grants them Combat Experience (XP) upon successful mission resolution, allowing for future promotion.</div>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -2157,7 +2356,10 @@ export default function GeneralHQ() {
                         <div style={{ fontSize: 9, color: "#e8b84b", letterSpacing: 3, marginBottom: 10 }}>SELECT COURSE OF ACTION:</div>
                         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                           {focused.options.map((opt, i) => (
-                            <div key={i} onClick={() => resolveMission(focused, opt)}
+                            <div key={i} onClick={() => {
+                              const officerId = document.getElementById("officer-select")?.value || null;
+                              resolveMission(focused, opt, officerId);
+                            }}
                               style={{ cursor: "pointer", background: "#050d05", border: `1px solid ${opt.color}22`, borderLeft: `3px solid ${opt.color}`, padding: 16, transition: "all 0.2s" }}
                               onMouseEnter={e => { e.currentTarget.style.background = "#0a1a0a"; e.currentTarget.style.borderColor = opt.color + "66"; }}
                               onMouseLeave={e => { e.currentTarget.style.background = "#050d05"; e.currentTarget.style.borderColor = opt.color + "22"; }}>
