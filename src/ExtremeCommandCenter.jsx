@@ -1732,6 +1732,8 @@ export default function GeneralHQ() {
               { id: "armory", label: "📦 DIVISION ARMORY" },
               { id: "academy", label: "🎓 OFFICER ACADEMY" },
               { id: "quarters", label: "🥃 GENERAL'S QUARTERS" },
+              { id: "cyber", label: "🖥 CYBER WARFARE" },
+              { id: "markets", label: "📈 GLOBAL MARKETS" },
             ].map(t => (
               <button key={t.id} className={`tab-btn${tab === t.id ? " active" : ""}`} onClick={() => setTab(t.id)}>
                 {t.label}
@@ -3510,7 +3512,261 @@ export default function GeneralHQ() {
 
 
 
+
+            {/* ══ CYBER WARFARE — USCYBERCOM ══ */}
+            {tab === "cyber" && (() => {
+              const cyberPosture = general.cyberPosture || "DEFEND";
+              const cyberOpsLaunched = general.cyberOpsLaunched || [];
+              return (
+                <div style={{ animation: "fadeUp 0.3s" }}>
+                  {/* Header Stats */}
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 10, marginBottom: 16 }}>
+                    {[
+                      { label: "OFFENSIVE OPS", val: cyberOpsLaunched.length, color: "#e84b4b" },
+                      { label: "BLACK BUDGET", val: `$${blackBudget}B`, color: "#ffd700" },
+                      { label: "CYBER POSTURE", val: cyberPosture, color: cyberPosture === "DEFEND" ? "#4caf50" : cyberPosture === "MONITOR" ? "#e8b84b" : "#e84b4b" },
+                      { label: "DEFCON LEVEL", val: def, color: def <= 2 ? "#e84b4b" : "#4caf50" },
+                    ].map(s => (
+                      <div key={s.label} className="panel" style={{ padding: 14, textAlign: "center" }}>
+                        <div style={{ fontSize: 22, color: s.color, fontFamily: "Oswald,sans-serif" }}>{s.val}</div>
+                        <div style={{ fontSize: 7, color: "#3a5a3a", letterSpacing: 2, marginTop: 4 }}>{s.label}</div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+                    {/* Offensive Operations */}
+                    <div>
+                      <div style={{ fontSize: 9, color: "#e84b4b", letterSpacing: 4, marginBottom: 12 }}>◈ OFFENSIVE CYBER OPERATIONS — FORT MEADE</div>
+                      {[
+                        { id: "stuxnet2", label: "STUXNET VARIANT Ω", desc: "Deploy polymorphic worm to Iranian enrichment PLCs at Natanz. Delay nuclear program 18-24 months.", cost: 20, risk: 0.25, reward: { pr: 20, ap: 8, defcon: 1 }, blowback: { pr: -10, ap: -15, defcon: -1 }, target: "🇮🇷 IRAN — NATANZ", color: "#e84b4b" },
+                        { id: "griddown", label: "GRID DOWN — PYONGYANG", desc: "Sabotage DPRK power grid infrastructure. Blind their early warning radar network for 72 hours.", cost: 15, risk: 0.35, reward: { pr: 15, ap: 5, defcon: 0 }, blowback: { pr: -5, ap: -10, defcon: -1 }, target: "🇰🇵 DPRK — PYONGYANG", color: "#e87a4b" },
+                        { id: "dragonstrike", label: "OPERATION DRAGON STRIKE", desc: "Intrusion campaign into PLA Naval C2 systems. Extract submarine patrol schedules and ICBM targeting data.", cost: 30, risk: 0.40, reward: { pr: 25, ap: 10, defcon: 0 }, blowback: { pr: -15, ap: -20, defcon: -2 }, target: "🇨🇳 CHINA — PLA NAVY", color: "#e8b84b" },
+                        { id: "ghostprotocol", label: "GHOST PROTOCOL — FSB", desc: "Compromise FSB internal comms. Plant disinformation to fracture Kremlin inner circle loyalty.", cost: 25, risk: 0.30, reward: { pr: 18, ap: 12, defcon: 1 }, blowback: { pr: -8, ap: -18, defcon: -1 }, target: "🇷🇺 RUSSIA — FSB MOSCOW", color: "#9b59b6" },
+                        { id: "financialwar", label: "SWIFT NETWORK STRIKE", desc: "Disrupt adversary central bank access to SWIFT. Crash currency, trigger economic panic.", cost: 35, risk: 0.20, reward: { pr: 12, ap: 5, defcon: 0 }, blowback: { pr: -5, ap: -25, defcon: -2 }, target: "🌐 MULTI-NATION TARGET", color: "#4b9ae8" },
+                        { id: "ransomblind", label: "DUAL-USE RANSOMWARE RELEASE", desc: "Deploy self-propagating ransomware through criminal proxies. Complete deniability. High profit, high scandal risk.", cost: 10, risk: 0.45, reward: { pr: 5, ap: 0, defcon: 0 }, blowback: { pr: -20, ap: -30, defcon: -1 }, target: "⚠ GLOBAL INFRASTRUCTURE", color: "#ffd700" },
+                      ].map(op => {
+                        const launched = cyberOpsLaunched.includes(op.id);
+                        return (
+                          <div key={op.id} className="panel" style={{ padding: 14, marginBottom: 8, borderLeft: `3px solid ${launched ? "#4caf5044" : op.color}`, opacity: launched ? 0.6 : 1 }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                              <div style={{ fontSize: 10, color: launched ? "#4caf50" : op.color, letterSpacing: 1 }}>{op.label}</div>
+                              <div style={{ display: "flex", gap: 8 }}>
+                                <div style={{ fontSize: 8, color: "#4a6a4a" }}>{op.target}</div>
+                                <div style={{ fontSize: 9, color: "#ffd700", fontFamily: "Oswald,sans-serif" }}>${op.cost}B</div>
+                              </div>
+                            </div>
+                            <div style={{ fontSize: 8, color: "#5a7a5a", lineHeight: 1.6, marginBottom: 8 }}>{op.desc}</div>
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                              <div style={{ fontSize: 7, color: op.risk > 0.35 ? "#e84b4b" : "#e8b84b" }}>
+                                INTERCEPT RISK: {Math.round(op.risk * 100)}% · REWARD: +{op.reward.pr} PR, +{op.reward.ap} AP
+                              </div>
+                              {!launched ? (
+                                <button className="btn btn-red" style={{ fontSize: 8, padding: "4px 10px" }}
+                                  disabled={blackBudget < op.cost}
+                                  onClick={() => {
+                                    if (blackBudget < op.cost) return notify("INSUFFICIENT BLACK BUDGET", "#e84b4b");
+                                    setBlackBudget(b => b - op.cost);
+                                    const success = Math.random() > op.risk;
+                                    if (success) {
+                                      updateGeneral({
+                                        prestige: Math.min(100, pres + op.reward.pr),
+                                        approval: Math.min(100, ap + op.reward.ap),
+                                        defcon: Math.max(1, Math.min(5, def + op.reward.defcon)),
+                                        cyberOpsLaunched: [...(general.cyberOpsLaunched || []), op.id]
+                                      });
+                                      notify(`✓ ${op.label} — MISSION SUCCESS. +${op.reward.pr} PR, +${op.reward.ap} AP`, "#4caf50");
+                                    } else {
+                                      updateGeneral({
+                                        prestige: Math.max(0, pres + op.blowback.pr),
+                                        approval: Math.max(0, ap + op.blowback.ap),
+                                        defcon: Math.max(1, Math.min(5, def + op.blowback.defcon)),
+                                        cyberOpsLaunched: [...(general.cyberOpsLaunched || []), op.id]
+                                      });
+                                      notify(`✗ ${op.label} — OPERATION BLOWN. Attribution leaked. Blowback imminent.`, "#e84b4b");
+                                    }
+                                  }}>
+                                  {blackBudget < op.cost ? "INSUFFICIENT FUNDS" : "⚡ AUTHORIZE STRIKE"}
+                                </button>
+                              ) : (
+                                <div style={{ fontSize: 8, color: "#4caf50", letterSpacing: 2 }}>✓ OP COMPLETE</div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* Right — Defensive Posture + Threat Grid */}
+                    <div>
+                      <div style={{ fontSize: 9, color: "#4caf50", letterSpacing: 4, marginBottom: 12 }}>◈ CYBERCOM DEFENSIVE POSTURE</div>
+                      <div style={{ marginBottom: 14 }}>
+                        {[
+                          { id: "DEFEND", label: "FORTRESS DEFENSE", desc: "All USCYBERCOM assets in pure defensive mode. 0 offensive ops. Highest protection.", color: "#4caf50", apGain: 3 },
+                          { id: "MONITOR", label: "ACTIVE MONITORING", desc: "Balanced hunt-forward posture. Detect and observe without engaging.", color: "#e8b84b", apGain: 1 },
+                          { id: "DEGRADE", label: "ACTIVE DEGRADATION", desc: "Hunting mode. Actively degrade adversarial infrastructure in real time.", color: "#e87a4b", apGain: -2 },
+                          { id: "WARMODE", label: "FULL CYBER WAR", desc: "Unrestricted domain dominance. Maximum offensive and defensive operations. High escalation risk.", color: "#e84b4b", apGain: -8 },
+                        ].map(p => (
+                          <div key={p.id} className="choice-card" style={{ marginBottom: 8, borderColor: cyberPosture === p.id ? p.color : "#1a2a1a", borderLeft: `3px solid ${p.color}` }}
+                            onClick={() => {
+                              updateGeneral({ cyberPosture: p.id, approval: Math.max(0, Math.min(100, ap + p.apGain)) });
+                              notify(`CYBERCOM POSTURE SET: ${p.label} (${p.apGain >= 0 ? "+" : ""}${p.apGain} AP)`, p.color);
+                            }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                              <div>
+                                <div style={{ fontSize: 10, color: p.color, letterSpacing: 1 }}>{p.label}</div>
+                                <div style={{ fontSize: 8, color: "#4a5a4a", marginTop: 2 }}>{p.desc}</div>
+                              </div>
+                              {cyberPosture === p.id && <div style={{ fontSize: 9, color: p.color }}>● ACTIVE</div>}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      <div style={{ fontSize: 9, color: "#9b59b6", letterSpacing: 4, marginBottom: 10 }}>◈ LIVE THREAT GRID — HOSTILE APTs</div>
+                      {[
+                        { actor: "APT41 (CHINA)", type: "Espionage + Financial", target: "DoD Contractor Networks", level: "CRITICAL", color: "#e84b4b" },
+                        { actor: "COZY BEAR (RUSSIA)", type: "Political Intrusion", target: "State Dept + NSC Email", level: "HIGH", color: "#e87a4b" },
+                        { actor: "LAZARUS (DPRK)", type: "Financial Heist", target: "SWIFT/Federal Reserve", level: "HIGH", color: "#e8b84b" },
+                        { actor: "CHARMING KITTEN (IRAN)", type: "Phishing / Social Eng.", target: "Nuclear Researcher Emails", level: "MEDIUM", color: "#9b59b6" },
+                        { actor: "FANCY BEAR (GRU)", type: "Infrastructure Attack", target: "NATO Power Grid Probes", level: "ELEVATED", color: "#4b9ae8" },
+                      ].map(t => (
+                        <div key={t.actor} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: "1px solid #0d1a0d" }}>
+                          <div>
+                            <div style={{ fontSize: 9, color: t.color, letterSpacing: 1 }}>{t.actor}</div>
+                            <div style={{ fontSize: 7, color: "#4a5a6a" }}>{t.type} → {t.target}</div>
+                          </div>
+                          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                            <div style={{ fontSize: 8, color: t.color, border: `1px solid ${t.color}44`, padding: "2px 8px", letterSpacing: 1 }}>{t.level}</div>
+                            <button className="btn" style={{ fontSize: 7, padding: "3px 8px" }} onClick={() => notify(`CYBERCOM hunting ${t.actor} — counter-intrusion authorized. +3 PR`, "#4b9ae8")}>HUNT</button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* ══ GLOBAL MARKETS — DEFENSE CONTRACTING ══ */}
+            {tab === "markets" && (() => {
+              const portfolio = general.stockPortfolio || {};
+              const DEFENSE_STOCKS = [
+                { id: "lmt", ticker: "LMT", name: "Lockheed Martin", price: 480 + (def <= 3 ? (5 - def) * 12 : 0) + (general.globalStats?.panicIndex || 0) * 1.2, sector: "Aerospace / Missiles", yield: "2.1%", color: "#4b9ae8" },
+                { id: "rtx", ticker: "RTX", name: "Raytheon Technologies", price: 105 + (def <= 3 ? (5 - def) * 5 : 0) + (general.globalStats?.panicIndex || 0) * 0.5, sector: "Missiles / Radar", yield: "1.8%", color: "#e8b84b" },
+                { id: "noc", ticker: "NOC", name: "Northrop Grumman", price: 520 + (def <= 3 ? (5 - def) * 14 : 0) + (general.globalStats?.panicIndex || 0) * 1.4, sector: "B-21 / Space", yield: "1.5%", color: "#4caf50" },
+                { id: "baesy", ticker: "BAESY", name: "BAE Systems PLC", price: 52 + (def <= 3 ? (5 - def) * 2 : 0) + (general.globalStats?.panicIndex || 0) * 0.3, sector: "UK Armored Vehicles", yield: "3.2%", color: "#9b59b6" },
+                { id: "ge", ticker: "GEV", name: "GE Vernova Energy", price: 170 + (general.globalStats?.econDamageTrillions || 0) * -5, sector: "Energy / Power Grid", yield: "1.2%", color: "#e87a4b" },
+                { id: "palantir", ticker: "PLTR", name: "Palantir Technologies", price: 28 + (cyberOpsLaunched => cyberOpsLaunched.length * 4)(general.cyberOpsLaunched || []), sector: "AI / Intelligence Analytics", yield: "0%", color: "#e84b4b" },
+              ];
+              const totalPortfolioValue = DEFENSE_STOCKS.reduce((sum, s) => sum + (portfolio[s.id] || 0) * s.price, 0);
+              return (
+                <div style={{ animation: "fadeUp 0.3s" }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 16 }}>
+                    {[
+                      { label: "PERSONAL ACCOUNT", val: `$${bankBalance.toLocaleString()}`, color: "#ffd700" },
+                      { label: "PORTFOLIO VALUE", val: `$${Math.round(totalPortfolioValue).toLocaleString()}`, color: "#4caf50" },
+                      { label: "GLOBAL PANIC INDEX", val: `${general.globalStats?.panicIndex || 0}%`, color: (general.globalStats?.panicIndex || 0) > 50 ? "#e84b4b" : "#4caf50" },
+                    ].map(s => (
+                      <div key={s.label} className="panel" style={{ padding: 14, textAlign: "center" }}>
+                        <div style={{ fontSize: 22, color: s.color, fontFamily: "Oswald,sans-serif" }}>{s.val}</div>
+                        <div style={{ fontSize: 7, color: "#3a5a3a", letterSpacing: 2, marginTop: 4 }}>{s.label}</div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div style={{ marginBottom: 10, background: "#0a0a00", border: "1px solid #2a2a00", padding: "10px 16px" }}>
+                    <div style={{ fontSize: 8, color: "#ffd700", letterSpacing: 2 }}>⚠ CLASSIFIED MARKET INTELLIGENCE: Higher DEFCON and Global Panic = higher defense stock prices. Escalating tensions is profitable — but costs approvals. Trade wisely.</div>
+                  </div>
+
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+                    <div>
+                      <div style={{ fontSize: 9, color: "#4caf50", letterSpacing: 4, marginBottom: 12 }}>◈ DEFENSE SECTOR EQUITIES — OFFSHORE ACCOUNT</div>
+                      {DEFENSE_STOCKS.map(stock => {
+                        const sharesOwned = portfolio[stock.id] || 0;
+                        const costBasis = 100; // simplified
+                        return (
+                          <div key={stock.id} className="panel" style={{ padding: 14, marginBottom: 8, borderLeft: `3px solid ${stock.color}` }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 6 }}>
+                              <div>
+                                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                                  <div style={{ fontSize: 11, color: stock.color, letterSpacing: 2, fontFamily: "Oswald,sans-serif" }}>{stock.ticker}</div>
+                                  <div style={{ fontSize: 9, color: "#c8ffc8" }}>{stock.name}</div>
+                                </div>
+                                <div style={{ fontSize: 7, color: "#4a5a4a", marginTop: 2 }}>{stock.sector} · Yield: {stock.yield}</div>
+                              </div>
+                              <div style={{ textAlign: "right" }}>
+                                <div style={{ fontSize: 16, color: "#ffd700", fontFamily: "Oswald,sans-serif" }}>${Math.round(stock.price).toLocaleString()}</div>
+                                <div style={{ fontSize: 7, color: "#4a6a4a" }}>{sharesOwned} shares · ${Math.round(sharesOwned * stock.price).toLocaleString()} value</div>
+                              </div>
+                            </div>
+                            <div style={{ display: "flex", gap: 6 }}>
+                              <button className="btn btn-gold" style={{ flex: 1, fontSize: 8, padding: "5px 0" }}
+                                disabled={bankBalance < stock.price * 10}
+                                onClick={() => {
+                                  const cost = Math.round(stock.price * 10);
+                                  if (bankBalance < cost) return notify("INSUFFICIENT FUNDS", "#e84b4b");
+                                  setBankBalance(b => b - cost);
+                                  updateGeneral({ stockPortfolio: { ...portfolio, [stock.id]: sharesOwned + 10 } });
+                                  notify(`BOUGHT 10 shares ${stock.ticker} @ $${Math.round(stock.price)} = -$${cost.toLocaleString()}`, "#ffd700");
+                                }}>
+                                BUY 10 SHARES (${Math.round(stock.price * 10).toLocaleString()})
+                              </button>
+                              {sharesOwned > 0 && (
+                                <button className="btn btn-red" style={{ flex: 1, fontSize: 8, padding: "5px 0" }}
+                                  onClick={() => {
+                                    const proceeds = Math.round(stock.price * sharesOwned);
+                                    setBankBalance(b => b + proceeds);
+                                    updateGeneral({ stockPortfolio: { ...portfolio, [stock.id]: 0 } });
+                                    notify(`SOLD ${sharesOwned} shares ${stock.ticker} @ $${Math.round(stock.price)} = +$${proceeds.toLocaleString()}`, "#4caf50");
+                                  }}>
+                                  SELL ALL (+${Math.round(stock.price * sharesOwned).toLocaleString()})
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    <div>
+                      <div style={{ fontSize: 9, color: "#e84b4b", letterSpacing: 4, marginBottom: 12 }}>◈ MARKET INTELLIGENCE — TENSION DRIVERS</div>
+                      <div className="panel" style={{ padding: 16, marginBottom: 14 }}>
+                        <div style={{ fontSize: 9, color: "#c8ffc8", marginBottom: 10 }}>CURRENT MARKET CONDITIONS</div>
+                        {[
+                          { factor: "DEFCON Level", impact: def <= 2 ? "↑↑ WAR PREMIUM" : def <= 3 ? "↑ ELEVATED" : "→ NEUTRAL", color: def <= 2 ? "#e84b4b" : def <= 3 ? "#e8b84b" : "#4caf50" },
+                          { factor: "Global Panic Index", impact: `${general.globalStats?.panicIndex || 0}% — ${(general.globalStats?.panicIndex || 0) > 60 ? "↑↑ SURGE" : "→ STABLE"}`, color: (general.globalStats?.panicIndex || 0) > 60 ? "#e84b4b" : "#4caf50" },
+                          { factor: "Active Crises", impact: `${liveMissions.filter(m => !m.resolved).length} active — ${liveMissions.filter(m => !m.resolved).length > 2 ? "↑ DEMAND UP" : "→ NEUTRAL"}`, color: liveMissions.filter(m => !m.resolved).length > 2 ? "#e8b84b" : "#4caf50" },
+                          { factor: "Cyber Ops Launched", impact: `${(general.cyberOpsLaunched || []).length} ops — ↑ PLTR premium`, color: "#9b59b6" },
+                          { factor: "Econ Damage", impact: `-$${general.globalStats?.econDamageTrillions || 0}T — ${(general.globalStats?.econDamageTrillions || 0) > 2 ? "↓↓ GEV impacted" : "→ MODERATE"}`, color: "#e87a4b" },
+                        ].map(f => (
+                          <div key={f.factor} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px solid #0d1a0d" }}>
+                            <div style={{ fontSize: 8, color: "#7a9a7a" }}>{f.factor}</div>
+                            <div style={{ fontSize: 8, color: f.color, fontFamily: "Oswald,sans-serif" }}>{f.impact}</div>
+                          </div>
+                        ))}
+                      </div>
+
+                      <div style={{ fontSize: 9, color: "#ffd700", letterSpacing: 4, marginBottom: 10 }}>◈ INSIDER TIPS — CLASSIFIED</div>
+                      {[
+                        { tip: "Declare DEFCON 2 to spike LMT/RTX/NOC by +30% each before selling.", risk: "HIGH APPROVAL COST" },
+                        { tip: "Launch 3+ Cyber Ops to push Palantir (PLTR) to peak price.", risk: "BLACK BUDGET COST" },
+                        { tip: "Cause Global Panic >70% for maximum defense sector surge across all stocks.", risk: "PRESIDENTIAL RELATION" },
+                        { tip: "Buy GEV before diplomatic successes reduce global tensions — capitalize on stability.", risk: "MARKET TIMING RISK" },
+                      ].map((tip, i) => (
+                        <div key={i} style={{ background: "#080800", border: "1px solid #2a2a00", padding: "10px 14px", marginBottom: 6 }}>
+                          <div style={{ fontSize: 8, color: "#c8b870", lineHeight: 1.6 }}>{tip.tip}</div>
+                          <div style={{ fontSize: 7, color: "#e84b4b", marginTop: 4 }}>RISK: {tip.risk}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+
             {/* FLOATING POTUS BUTTON */}
+
             <button onClick={() => setShowPotus(!showPotus)} style={{ position: "fixed", bottom: 60, right: 20, zIndex: 3500, background: "#1a1400", border: "1px solid #ffd700", color: "#ffd700", fontFamily: "'Share Tech Mono',monospace", fontSize: 10, padding: "10px 16px", cursor: "pointer", letterSpacing: 2, boxShadow: "0 0 12px #ffd70044", animation: "goldGlow 3s infinite" }}>
               🏛 POTUS MEETING
             </button>
