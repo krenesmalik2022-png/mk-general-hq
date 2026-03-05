@@ -937,7 +937,31 @@ export default function GeneralHQ() {
   const [currentPressEvent, setCurrentPressEvent] = useState(null);
   const [pressHistory, setPressHistory] = useState([]);
   const [presidentialMeet, setPresidentialMeet] = useState(null);
+  const [potusTrust, setPotusTrust] = useState(70);
+  const [militaryLoyalty, setMilitaryLoyalty] = useState(85);
+  const [isJunta, setIsJunta] = useState(false);
+  const [juntaTicks, setJuntaTicks] = useState(0);
   const [nuclearWinter, setNuclearWinter] = useState(false);
+
+  // NEW: Jail System State
+  const [detained, setDetained] = useState([
+    { id: "p1", name: "Khalil 'The Ghost' Al-Zawahiri", type: "TERRORIST HVT", status: "INTERROGATION", intelYield: 45 },
+    { id: "p2", name: "Sen. Robert Vance", type: "POLITICAL DISSIDENT", status: "SOLITARY", intelYield: 15 },
+    { id: "p3", name: "Gen. Viktor Morozov", type: "DEFECTOR / POW", status: "PROCESSING", intelYield: 80 }
+  ]);
+
+  // Politician Relationship Network
+  const [politicians, setPoliticians] = useState([
+    { id: "sec_def",   name: "Sec. Mark Ellis",     role: "Secretary of Defense",     relation: 72, emoji: "🏛", favor: "ALLY",    riskyAbility: "Authorize black budget", stance: "PRO-MILITARY" },
+    { id: "sec_state", name: "Sec. Rachel Okafor",  role: "Secretary of State",       relation: 55, emoji: "📜", favor: "NEUTRAL", riskyAbility: "Cover up an operation", stance: "DIPLOMATIC" },
+    { id: "sen_hawk",  name: "Sen. John Hargrove",  role: "Senate Armed Svcs (SASC)", relation: 60, emoji: "⚔️", favor: "ALLY",    riskyAbility: "Push military budget up", stance: "HAWK" },
+    { id: "sen_dove",  name: "Sen. Lisa Hartwell",  role: "Senate Finance Chair",     relation: 30, emoji: "📉", favor: "HOSTILE", riskyAbility: "Trigger DoD audit", stance: "DOVE" },
+    { id: "gov_tex",   name: "Gov. Brent Cole",     role: "Governor of Texas (NG)",   relation: 80, emoji: "🤠", favor: "ALLY",    riskyAbility: "Deploy National Guard", stance: "PRO-MILITARY" },
+    { id: "cia_dir",   name: "Dir. Claudia Vega",   role: "CIA Director",             relation: 65, emoji: "👁", favor: "ALLY",    riskyAbility: "Classify an operation", stance: "INTEL" },
+    { id: "fbi_dir",   name: "Dir. Frank Hoover",   role: "FBI Director",             relation: 42, emoji: "🕵️", favor: "NEUTRAL", riskyAbility: "Open an investigation", stance: "LAW" },
+    { id: "vp",        name: "VP Samuel Morris",    role: "Vice President",           relation: 68, emoji: "🤝", favor: "ALLY",    riskyAbility: "Backdoor POTUS orders", stance: "MODERATE" },
+  ]);
+
   const [banks, setBanks] = useState({ personal: 45000, offshore: 0, slushFund: 5000000 }); // 3 independent accounts
   const [branchBudgets, setBranchBudgets] = useState({ army: 185, navy: 202, airforce: 216, marines: 53, spaceforce: 30 });
   const [heroRoster, setHeroRoster] = useState([]);
@@ -1401,16 +1425,55 @@ export default function GeneralHQ() {
     notify(`DEFCON changed to ${d}`, defconColor(d));
   }
 
-  function handleCoup(choice) {
-    if (choice === "suppress") {
-      updateGeneral({ approval: Math.min(100, (general.approval || 70) + 20), prestige: Math.min(100, (general.prestige || 60) + 15), coupStatus: "suppressed" });
-      notify("Coup suppressed. POTUS owes you everything.", "#4caf50");
-    } else if (choice === "join") {
-      updateGeneral({ approval: 0, prestige: 0, coupStatus: "joined" });
-      notify("Court martial proceedings initiated. Career over.", "#e84b4b");
+  function handleDomesticCoup() {
+    if (militaryLoyalty >= 80 && (general.prestige || 60) >= 70) {
+      // Successful Coup
+      setIsJunta(true);
+      setJuntaTicks(7 * 60); // Roughly 7 in-game months (420 ticks)
+      setPotusTrust(0);
+      updateGeneral({
+        approval: 0,
+        prestige: 100,
+        coupStatus: "dictator",
+        globalStats: { ...general.globalStats, panicIndex: 100 }
+      });
+      notify("COUP SUCCESSFUL. YOU ARE NOW THE SUPREME COMMANDER OF THE UNITED STATES.", "#9b59b6");
+      setNewsTicker(t => ["BREAKING: MILITARY SEIZES CONTROL OF WASHINGTON", "PRESIDENT DETAINED AT UNDISCLOSED LOCATION", "MARTIAL LAW DECLARED NATIONWIDE", ...t]);
+      setLiveTerminalLog(l => [{ id: Date.now(), text: "SYS // CONTINUITY OF GOVERNMENT SUSPENDED. NATIONAL COMMAND AUTHORITY TRANSFERRED TO JOINT CHIEFS.", type: "error", timestamp: new Date().toLocaleTimeString() }, ...l]);
+    } else {
+      // Failed Coup
+      updateGeneral({ approval: 0, prestige: 0, coupStatus: "failed_coup" });
+      notify("COUP FAILED. MILITARY DIVIDED. Secret Service and loyalist elements have secured the Capitol.", "#e84b4b");
+      setNewsTicker(t => ["BREAKING: MILITARY COUP ATTEMPT THWARTED IN DC", "ROGUE GENERALS ARRESTED FOR TREASON", ...t]);
     }
-    setCoupPhase(0);
   }
+
+  function handleEndJunta() {
+    setIsJunta(false);
+    setPotusTrust(60);
+    updateGeneral({
+      approval: 50,
+      prestige: 80,
+      coupStatus: "shadow_commander",
+      globalStats: { ...general.globalStats, panicIndex: Math.max(0, (general.globalStats?.panicIndex || 100) - 50) }
+    });
+    notify("TRANSITION COMPLETE. Puppet civilian administration installed. You command from the shadows.", "#4caf50");
+    setNewsTicker(t => ["BREAKING: MILITARY JUNTA STEPS DOWN. NEW ELECTIONS ANNOUNCED.", "CIVILIAN GOVERNMENT RESTORED, BUT HEAVILY INFLUENCED BY PENTAGON", ...t]);
+  }
+
+  // Effect for Junta duration
+  useEffect(() => {
+    if (!loaded || !isJunta || nuclearWinter) return;
+    if (tick > 0 && juntaTicks > 0) {
+      setJuntaTicks(t => t - 1);
+      if (tick % 5 === 0) {
+        // Drain money, passive damage to economy
+        setEconStatus(e => ({ ...e, gdp: +(e.gdp - 0.2).toFixed(1), marketIndex: +(e.marketIndex - 1.5).toFixed(1) }));
+      }
+    } else if (tick > 0 && juntaTicks === 0 && isJunta) {
+      handleEndJunta();
+    }
+  }, [tick, loaded, isJunta, juntaTicks, nuclearWinter]);
 
   function initPressBriefing() {
     if (activeLiveMission && !currentPressEvent) {
@@ -1473,15 +1536,27 @@ export default function GeneralHQ() {
   }
 
   function meetPresident(stance) {
+    if (isJunta) {
+      notify("YOU ARE THE JUNTA. There is no President to meet.", "#9b59b6");
+      return;
+    }
+
     const outcomes = {
-      "support": { apD: +10, msg: "POTUS shakes your hand firmly. 'General, you have my full confidence.' Approval rating up. Joint Chiefs impressed." },
-      "advise": { apD: +5, msg: "POTUS listens carefully to your assessment. You earn a reputation as a trusted voice. 'I want you in every NSC meeting,' he says." },
-      "pushback": { apD: -12, msg: "POTUS doesn't like being told no. Tense exchange. 'Remember who you work for, General.' You've spent political capital." },
-      "resign_threat": { apD: -25, msg: "POTUS stares at you. 'Is that a threat?' The room goes cold. You backed down — but the relationship is damaged permanently." },
+      "golf": { ptD: +15, apD: -2, presD: +5, msg: "18 holes at Mar-a-Lago. POTUS is relaxed. 'You're one of the good ones, General.' Trust increased significantly, but media criticizes the cronyism." },
+      "dinner": { ptD: +10, apD: +2, presD: +2, msg: "Private dinner at the White House. You shared tactical insights. POTUS values your counsel." },
+      "endorse": { ptD: +5, apD: +10, presD: -5, msg: "You publicly endorsed the administration's military policy. Approval spikes, but your peers view you as a political hack." },
+      "leak": { ptD: -20, apD: -5, presD: +10, msg: "You leaked classified pushback to the press. The administration looks weak. POTUS is furious, but the Pentagon respects your hardline stance." },
+      "disobey": { ptD: -30, apD: +5, presD: +15, msg: "You outright ignored a direct executive order regarding troop withdrawal. POTUS is threatening to fire you. The military stands behind you." }
     };
     const o = outcomes[stance];
-    updateGeneral({ approval: Math.max(0, Math.min(100, (general.approval || 70) + o.apD)), presidentialMeetings: (general.presidentialMeetings || 0) + 1 });
-    setPresidentialMeet({ msg: o.msg, apD: o.apD });
+
+    setPotusTrust(t => Math.max(0, Math.min(100, t + o.ptD)));
+    updateGeneral({
+      approval: Math.max(0, Math.min(100, (general.approval || 70) + o.apD)),
+      prestige: Math.max(0, Math.min(100, (general.prestige || 60) + o.presD)),
+      presidentialMeetings: (general.presidentialMeetings || 0) + 1
+    });
+    setPresidentialMeet({ msg: o.msg, ptD: o.ptD, apD: o.apD });
   }
 
   if (!loaded) return (
@@ -1813,6 +1888,7 @@ export default function GeneralHQ() {
               { id: "armory", label: "📦 DIVISION ARMORY" },
               { id: "academy", label: "🎓 OFFICER ACADEMY" },
               { id: "quarters", label: "🥃 GENERAL'S QUARTERS" },
+              { id: "press", label: "🎙️ PRESS BRIEFING" },
               { id: "cyber", label: "🖥 CYBER WARFARE" },
               { id: "markets", label: "📈 GLOBAL MARKETS" },
             ].map(t => (
@@ -2300,65 +2376,90 @@ export default function GeneralHQ() {
                   {/* Presidential relationship */}
                   <div>
                     <div style={{ fontSize: 9, color: "#7a6a3a", letterSpacing: 4, marginBottom: 12 }}>◈ PRESIDENTIAL RELATIONSHIP</div>
-                    <div className="panel-gold" style={{ padding: 20, marginBottom: 14, border: "1px solid #2a2a00" }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 16 }}>
-                        <div style={{ width: 60, height: 60, border: `2px solid ${approvalColor(ap)}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 28, background: "#080800" }}>🏛</div>
-                        <div>
-                          <div style={{ fontSize: 11, color: "#c8b870", letterSpacing: 2 }}>THE PRESIDENT</div>
-                          <div style={{ fontSize: 9, color: "#5a5a3a" }}>Commander-in-Chief</div>
-                          <div style={{ fontSize: 9, color: approvalColor(ap), marginTop: 4 }}>{approvalLabel(ap)} ({ap}%)</div>
-                        </div>
+
+                    {isJunta ? (
+                      <div className="panel" style={{ padding: 30, border: "2px solid #9b59b6", textAlign: "center", marginBottom: 14 }}>
+                        <div style={{ fontSize: 40, marginBottom: 10 }}>👑</div>
+                        <div style={{ fontSize: 14, color: "#c8b8ff", letterSpacing: 4, marginBottom: 8, fontWeight: "bold" }}>MILITARY JUNTA ACTIVE</div>
+                        <div style={{ fontSize: 10, color: "#a898df", marginBottom: 16 }}>You have suspended the Constitution. The civilian government is dissolved.</div>
+                        <div style={{ fontSize: 12, color: "#e84b4b", fontFamily: "monospace" }}>JUNTA DURATION: T-{juntaTicks} TICKS</div>
                       </div>
-                      {/* Approval bar */}
-                      <div style={{ marginBottom: 16 }}>
-                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 8, color: "#5a5a3a", marginBottom: 4 }}>
-                          <span>PRESIDENTIAL APPROVAL</span><span style={{ color: approvalColor(ap) }}>{ap}%</span>
+                    ) : (
+                      <div className="panel-gold" style={{ padding: 20, marginBottom: 14, border: "1px solid #2a2a00" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 16 }}>
+                          <div style={{ width: 60, height: 60, border: `2px solid ${potusTrust > 50 ? "#4caf50" : "#e84b4b"}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 28, background: "#080800" }}>🏛</div>
+                          <div>
+                            <div style={{ fontSize: 11, color: "#c8b870", letterSpacing: 2 }}>THE PRESIDENT</div>
+                            <div style={{ fontSize: 9, color: "#5a5a3a" }}>Commander-in-Chief</div>
+                            <div style={{ fontSize: 9, color: potusTrust > 50 ? "#4caf50" : "#e84b4b", marginTop: 4 }}>TRUST: {potusTrust}%</div>
+                          </div>
                         </div>
-                        <div style={{ height: 8, background: "#0a0a00", borderRadius: 2 }}>
-                          <div style={{ height: "100%", width: `${ap}%`, background: `linear-gradient(90deg,${approvalColor(ap)}88,${approvalColor(ap)})`, borderRadius: 2, transition: "width 0.8s" }} />
+                        {/* Trust bar */}
+                        <div style={{ marginBottom: 16 }}>
+                          <div style={{ height: 8, background: "#0a0a00", borderRadius: 2 }}>
+                            <div style={{ height: "100%", width: `${potusTrust}%`, background: `linear-gradient(90deg,${potusTrust > 50 ? "#4caf50" : "#e84b4b"}88,${potusTrust > 50 ? "#4caf50" : "#e84b4b"})`, borderRadius: 2, transition: "width 0.8s" }} />
+                          </div>
+                          {potusTrust < 25 && <div style={{ fontSize: 8, color: "#e84b4b", marginTop: 6, animation: "pulse 1.5s infinite" }}>⚠ HIGH FIRING RISK — POTUS views you as a threat</div>}
+                          {potusTrust >= 80 && <div style={{ fontSize: 8, color: "#4caf50", marginTop: 6 }}>★ INNER CIRCLE — POTUS rubber-stamps your requests</div>}
                         </div>
-                        {ap < 30 && <div style={{ fontSize: 8, color: "#e84b4b", marginTop: 6, animation: "pulse 1.5s infinite" }}>⚠ FIRING RISK — Improve approval immediately</div>}
-                        {ap >= 80 && <div style={{ fontSize: 8, color: "#4caf50", marginTop: 6 }}>★ HIGHLY TRUSTED — POTUS relies on your judgment</div>}
-                      </div>
-                      {/* Meeting options */}
-                      <div style={{ fontSize: 9, color: "#7a6a3a", letterSpacing: 3, marginBottom: 10 }}>REQUEST OVAL OFFICE MEETING:</div>
-                      {[
-                        { id: "support", label: "EXPRESS FULL SUPPORT", desc: "Reaffirm your loyalty and commitment", apEffect: "+10" },
-                        { id: "advise", label: "OFFER STRATEGIC COUNSEL", desc: "Present your military assessment", apEffect: "+5" },
-                        { id: "pushback", label: "PUSH BACK ON A DECISION", desc: "Challenge an order you disagree with", apEffect: "-12" },
-                        { id: "resign_threat", label: "THREATEN RESIGNATION", desc: "Use your position as leverage", apEffect: "-25" },
-                      ].map(m => (
-                        <div key={m.id} className="choice-card" style={{ marginBottom: 6, borderColor: "#2a2a00" }} onClick={() => meetPresident(m.id)}>
-                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                            <div>
-                              <div style={{ fontSize: 10, color: "#c8b870", letterSpacing: 1 }}>{m.label}</div>
-                              <div style={{ fontSize: 8, color: "#4a4a3a", marginTop: 2 }}>{m.desc}</div>
+                        {/* Meeting options */}
+                        <div style={{ fontSize: 9, color: "#7a6a3a", letterSpacing: 3, marginBottom: 10 }}>POLITICAL MANEUVERS:</div>
+                        {[
+                          { id: "golf", label: "GOLF AT MAR-A-LAGO", desc: "Build personal rapport offline", ptEffect: "+15", prEffect: "+5" },
+                          { id: "dinner", label: "PRIVATE WH DINNER", desc: "Provide strategic counsel", ptEffect: "+10", prEffect: "+2" },
+                          { id: "endorse", label: "PUBLIC ENDORSEMENT", desc: "Praise POTUS policies", ptEffect: "+5", prEffect: "-5" },
+                          { id: "leak", label: "LEAK TO THE PRESS", desc: "Undermine POTUS anonymously", ptEffect: "-20", prEffect: "+10" },
+                          { id: "disobey", label: "DISOBEY DIRECT ORDER", desc: "Refuse an executive command", ptEffect: "-30", prEffect: "+15" },
+                        ].map(m => (
+                          <div key={m.id} className="choice-card" style={{ marginBottom: 6, borderColor: "#2a2a00" }} onClick={() => meetPresident(m.id)}>
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                              <div>
+                                <div style={{ fontSize: 10, color: "#c8b870", letterSpacing: 1 }}>{m.label}</div>
+                                <div style={{ fontSize: 8, color: "#4a4a3a", marginTop: 2 }}>{m.desc}</div>
+                              </div>
+                              <div style={{ display: "flex", gap: 6 }}>
+                                <div style={{ fontSize: 8, color: m.ptEffect.startsWith("+") ? "#4caf50" : "#e84b4b", minWidth: 20, textAlign: "right" }}>TR {m.ptEffect}</div>
+                                <div style={{ fontSize: 8, color: m.prEffect.startsWith("+") ? "#4caf50" : "#e84b4b", minWidth: 20, textAlign: "right" }}>PR {m.prEffect}</div>
+                              </div>
                             </div>
-                            <div style={{ fontSize: 9, color: m.apEffect.startsWith("+") ? "#4caf50" : "#e84b4b", minWidth: 30, textAlign: "right" }}>{m.apEffect}</div>
                           </div>
-                        </div>
-                      ))}
-                    </div>
+                        ))}
+                      </div>
+                    )}
+                    {presidentialMeet && (
+                      <div className="panel" style={{ padding: 16, border: "1px solid #2a4a2a", animation: "fadeUp 0.4s" }}>
+                        <div style={{ fontSize: 9, color: "#e8b84b", letterSpacing: 3, marginBottom: 8 }}>POLITICAL OUTCOME</div>
+                        <div style={{ fontSize: 10, color: "#8aaa7a", lineHeight: 1.6 }}>{presidentialMeet.msg}</div>
+                      </div>
+                    )}
                   </div>
-                  {/* Congressional + Allies */}
+                  {/* Mil + Allies */}
                   <div>
-                    <div style={{ fontSize: 9, color: "#3a5a3a", letterSpacing: 4, marginBottom: 12 }}>◈ POLITICAL LANDSCAPE</div>
+                    <div style={{ fontSize: 9, color: "#3a5a3a", letterSpacing: 4, marginBottom: 12 }}>◈ MILITARY LOYALTY</div>
                     <div className="panel" style={{ padding: 16, marginBottom: 14 }}>
-                      <div style={{ fontSize: 10, color: "#c8ffc8", marginBottom: 12 }}>CONGRESSIONAL RELATIONS</div>
-                      {[
-                        { name: "Senate Armed Services", stance: "SUPPORTIVE", color: "#4caf50", seats: "18/22" },
-                        { name: "House Armed Services", stance: "MIXED", color: "#e8b84b", seats: "15/30" },
-                        { name: "Intelligence Committee", stance: "SKEPTICAL", color: "#e84b4b", seats: "8/16" },
-                      ].map(c => (
-                        <div key={c.name} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px solid #0d1a0d" }}>
-                          <div style={{ fontSize: 9, color: "#7a9a7a" }}>{c.name}</div>
-                          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                            <div style={{ fontSize: 8, color: c.color }}>{c.stance}</div>
-                            <div style={{ fontSize: 8, color: "#3a5a3a" }}>{c.seats}</div>
-                          </div>
-                        </div>
-                      ))}
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 10 }}>
+                        <div style={{ fontSize: 10, color: "#c8ffc8" }}>ARMED FORCES ALLEGIANCE</div>
+                        <div style={{ fontSize: 14, color: militaryLoyalty > 70 ? "#4caf50" : "#e8b84b", fontWeight: "bold" }}>{militaryLoyalty}%</div>
+                      </div>
+                      <div style={{ height: 4, background: "#0a1a0a", marginBottom: 16 }}>
+                        <div style={{ height: "100%", width: `${militaryLoyalty}%`, background: militaryLoyalty > 70 ? "#4caf50" : "#e8b84b" }} />
+                      </div>
+
+                      <div style={{ fontSize: 8, color: "#5a7a5a", marginBottom: 12 }}>Who does the military serve? The Constitution, or you? High loyalty enables drastic actions like a coup against the civilian government.</div>
+
+                      <div style={{ display: "flex", gap: 8 }}>
+                        <button className="btn" style={{ flex: 1, padding: "8px", fontSize: 8 }} onClick={() => {
+                          if (banks.slushFund >= 5000000) {
+                            setBanks(b => ({ ...b, slushFund: b.slushFund - 5000000 }));
+                            setMilitaryLoyalty(m => Math.min(100, m + 10));
+                            notify("Paid Off Generals: Military Loyalty +10%", "#4caf50");
+                          } else {
+                            notify("INSUFFICIENT SLUSH FUND ($5M req)", "#e84b4b");
+                          }
+                        }}>BUY LOYALTY ($5M Slush)</button>
+                      </div>
                     </div>
+
                     <div className="panel" style={{ padding: 16 }}>
                       <div style={{ fontSize: 10, color: "#c8ffc8", marginBottom: 12 }}>ALLIED COMMANDERS</div>
                       {[
@@ -2376,6 +2477,59 @@ export default function GeneralHQ() {
                     </div>
                   </div>
                 </div>
+
+                {/* FULL POLITICIAN NETWORK */}
+                <div style={{ marginTop: 16 }}>
+                  <div style={{ fontSize: 9, color: "#e8b84b", letterSpacing: 4, marginBottom: 12 }}>◈ POLITICAL POWER NETWORK — KEY RELATIONSHIPS</div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 10 }}>
+                    {politicians.map(pol => {
+                      const relColor = pol.relation >= 70 ? "#4caf50" : pol.relation >= 40 ? "#e8b84b" : "#e84b4b";
+                      return (
+                        <div key={pol.id} className="panel" style={{ padding: 14, borderTop: `3px solid ${relColor}`, position: "relative" }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                            <div style={{ fontSize: 18 }}>{pol.emoji}</div>
+                            <div style={{ fontSize: 7, color: relColor, border: `1px solid ${relColor}`, padding: "1px 6px" }}>{pol.favor}</div>
+                          </div>
+                          <div style={{ fontSize: 10, color: "#c8ffc8", fontWeight: "bold", marginBottom: 2 }}>{pol.name}</div>
+                          <div style={{ fontSize: 7, color: "#5a7a5a", marginBottom: 6 }}>{pol.role}</div>
+                          <div style={{ marginBottom: 8 }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 7, color: "#5a7a5a", marginBottom: 2 }}>
+                              <span>RELATION</span><span style={{ color: relColor }}>{pol.relation}%</span>
+                            </div>
+                            <div style={{ height: 3, background: "#0a1a0a" }}>
+                              <div style={{ height: "100%", width: `${pol.relation}%`, background: relColor, transition: "width 0.5s" }} />
+                            </div>
+                          </div>
+                          <div style={{ fontSize: 7, color: "#4a6a4a", marginBottom: 8 }}>STANCE: {pol.stance}</div>
+                          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                            <button className="btn" style={{ fontSize: 7, padding: "4px 6px" }} onClick={() => {
+                              setPoliticians(prev => prev.map(p => p.id === pol.id ? { ...p, relation: Math.min(100, p.relation + 8), favor: Math.min(100, p.relation + 8) >= 70 ? "ALLY" : p.favor } : p));
+                              updateGeneral({ approval: Math.min(100, ap + 2) });
+                              notify(`🤝 Met with ${pol.name} — Relationship +8`, "#4caf50");
+                            }}>🤝 PRIVATE MEETING (+8)</button>
+                            <button className="btn" style={{ fontSize: 7, padding: "4px 6px", borderColor: "#ffd700", color: "#ffd700" }} onClick={() => {
+                              if (banks.personal < 50000) return notify("NEED $50K", "#e84b4b");
+                              setBanks(b => ({ ...b, personal: b.personal - 50000 }));
+                              setPoliticians(prev => prev.map(p => p.id === pol.id ? { ...p, relation: Math.min(100, p.relation + 20), favor: "BOUGHT" } : p));
+                              notify(`💰 ${pol.name} BRIBED — +20 Relation (-$50K)`, "#ffd700");
+                            }}>💰 BRIBE (-$50K +20)</button>
+                            <button className="btn btn-red" style={{ fontSize: 7, padding: "4px 6px" }} onClick={() => {
+                              setPoliticians(prev => prev.map(p => p.id === pol.id ? { ...p, relation: Math.max(0, p.relation - 30), favor: "HOSTILE" } : p));
+                              updateGeneral({ prestige: Math.min(100, pres + 5) });
+                              notify(`📄 DOSSIER RELEASED on ${pol.name} — Relation -30, +5 PR`, "#e84b4b");
+                            }}>📊 RELEASE DOSSIER (-30)</button>
+                            {pol.relation >= 75 && (
+                              <button className="btn" style={{ fontSize: 7, padding: "4px 6px", borderColor: "#9b59b6", color: "#9b59b6" }} onClick={() => {
+                                notify(`⭐ SPECIAL FAVOR from ${pol.name}: ${pol.riskyAbility}`, "#9b59b6");
+                                updateGeneral({ prestige: Math.min(100, pres + 10), approval: Math.min(100, ap + 5) });
+                              }}>⭐ CALL FAVOR (+10 PR)</button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
               </div>
             )}
 
@@ -2388,7 +2542,6 @@ export default function GeneralHQ() {
                     {[
                       { title: "DPRK INTERNAL COUP", status: "ONGOING", region: "North Korea", detail: "Rogue elements of the North Korean 4th Corps are maneuvering toward Pyongyang. Kim's inner circle is fragmenting. Window: 48 hours.", options: [{ label: "SUPPORT COUP — DESTABILIZE DPRK", effect: { ap: -5, p: +8 }, emoji: "⚠" }, { label: "SUPPORT KIM — MAINTAIN STABILITY", effect: { ap: +8, p: +5 }, emoji: "✓" }, { label: "DO NOTHING — MONITOR", effect: { ap: 0, p: 0 }, emoji: "👁" }] },
                       { title: "VENEZUELA MILITARY REVOLT", status: "DEVELOPING", region: "Venezuela", detail: "Senior Venezuelan Army officers have reached out to CIA requesting US support for a coup against Maduro. DoD and State are divided on response.", options: [{ label: "PROVIDE COVERT SUPPORT", effect: { ap: -10, p: +5 }, emoji: "🤫" }, { label: "INFORM STATE — DECLINE COVERTLY", effect: { ap: +5, p: +3 }, emoji: "📋" }, { label: "COORDINATE WITH REGIONAL ALLIES", effect: { ap: +8, p: +8 }, emoji: "🤝" }] },
-                      { title: "DOMESTIC COUP ATTEMPT", status: "CRITICAL", region: "Washington DC", detail: "Three senior generals have approached you about removing the President by force. FBI counterintelligence is watching.", options: [{ label: "REPORT TO SecDef IMMEDIATELY", effect: { ap: +25, p: +30 }, emoji: "🚨" }, { label: "LISTEN — DON'T COMMIT", effect: { ap: -10, p: -10 }, emoji: "⚠" }, { label: "JOIN THE CONSPIRACY", effect: { ap: -100, p: -50 }, emoji: "☠" }] },
                     ].map((coup, i) => (
                       <div key={i} className="panel" style={{ padding: 18, marginBottom: 12, border: `1px solid ${coup.status === "CRITICAL" ? "#e84b4b44" : "#2a1a4a44"}` }}>
                         <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
@@ -2411,23 +2564,31 @@ export default function GeneralHQ() {
                             </div>
                           </div>
                         ))}
-                        {/* Assignment dropdown */}
-                        <div style={{ marginTop: 16, background: "#050a05", padding: "10px 14px", border: "1px solid #1a2a1a" }}>
-                          <div style={{ fontSize: 8, color: "#c8b870", letterSpacing: 2, marginBottom: 8 }}>ASSIGN COMMANDING OFFICER (OPTIONAL)</div>
-                          <select
-                            id="officer-select"
-                            className="fikra-input"
-                            style={{ width: "100%", padding: "8px", fontSize: 10, background: "#000", border: "1px solid #2a3a2a", color: "#c8ffc8" }}
-                          >
-                            <option value="">NO OFFICER ASSIGNED (GENERAL DIRECT COMMAND)</option>
-                            {officerRoster.filter(o => o.status === "ACTIVE").map(o => (
-                              <option key={o.id} value={o.id}>{o.rank} {o.name.toUpperCase()} — {o.unit} ({o.specialty})</option>
-                            ))}
-                          </select>
-                          <div style={{ fontSize: 7, color: "#5a7a5a", marginTop: 6 }}>Assigning an officer grants them Combat Experience (XP) upon successful mission resolution, allowing for future promotion.</div>
-                        </div>
                       </div>
                     ))}
+
+                    {/* The Domestic Coup Action */}
+                    <div className="panel" style={{ padding: 18, border: "1px solid #e84b4b", background: "linear-gradient(135deg, rgba(232,75,75,0.05), rgba(0,0,0,0))" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+                        <div style={{ fontSize: 11, color: "#ff6b6b", letterSpacing: 2, fontWeight: "bold" }}>DOMESTIC MILITARY COUP</div>
+                        <div style={{ fontSize: 8, color: "#e84b4b", border: "1px solid #e84b4b", padding: "2px 8px", letterSpacing: 2, animation: "blink 1.5s infinite" }}>CRITICAL</div>
+                      </div>
+                      <div style={{ fontSize: 9, color: "#e84b4b", marginBottom: 8, fontWeight: "bold" }}>📍 WASHINGTON DC, PENTAGON</div>
+                      <div style={{ fontSize: 10, color: "#ffb4b4", lineHeight: 1.8, marginBottom: 16 }}>
+                        The civilian administration is weak. The nation is divided. As the highest-ranking military official, you have the loyalty of the armed forces. You can seize control of the capital, suspend the Constitution, and establish a Military Junta. If Military Loyalty or Prestige is too low, the coup will fail and you will be executed for treason.
+                      </div>
+
+                      {!isJunta ? (
+                        <button className="btn btn-red" style={{ width: "100%", padding: "12px", fontSize: 10, letterSpacing: 2, fontWeight: "bold" }} onClick={handleDomesticCoup}>
+                          ☠ SEIZE CONTROL OF THE UNITED STATES ☠
+                        </button>
+                      ) : (
+                        <div style={{ color: "#9b59b6", fontSize: 12, fontWeight: "bold", textAlign: "center", textShadow: "0 0 10px #9b59b6" }}>
+                          YOU ALREADY CONTROL THE NATION
+                        </div>
+                      )}
+                    </div>
+
                   </div>
                   {/* Threat assessment */}
                   <div>
@@ -3352,6 +3513,70 @@ export default function GeneralHQ() {
                         </button>
                       </div>
                     ))}
+                  </div>
+
+                  {/* JAIL / BLACK SITE SYSTEM */}
+                  <div style={{ gridColumn: "1 / -1", marginTop: 14 }}>
+                    <div style={{ fontSize: 9, color: "#e84b4b", letterSpacing: 4, marginBottom: 12 }}>◈ UNDISCLOSED BLACK SITE FACILITY</div>
+                    <div className="panel" style={{ padding: 16, border: "1px solid #3a1a1a", borderLeft: "4px solid #e84b4b" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+                        <div>
+                          <div style={{ fontSize: 12, color: "#ffb4b4", letterSpacing: 2 }}>CLASSIFIED DETENTION WING</div>
+                          <div style={{ fontSize: 8, color: "#a85a5a", marginTop: 4 }}>Extralegal holding facility for High Value Targets and Political Dissidents.</div>
+                        </div>
+                        <div style={{ textAlign: "right" }}>
+                          <div style={{ fontSize: 18, color: "#e84b4b", fontFamily: "Oswald,sans-serif" }}>{detained.length}</div>
+                          <div style={{ fontSize: 7, color: "#a85a5a" }}>CURRENT INMATES</div>
+                        </div>
+                      </div>
+
+                      {detained.length === 0 ? (
+                        <div style={{ fontSize: 10, color: "#5a3a3a", fontStyle: "italic", textAlign: "center", padding: "20px 0" }}>ALL CELLS EMPTY. NO ACTIVE DETAINEES.</div>
+                      ) : (
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+                          {detained.map(inmate => (
+                            <div key={inmate.id} className="panel" style={{ padding: 12, background: "#050202", border: "1px solid #4a1a1a" }}>
+                              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+                                <div style={{ fontSize: 11, color: "#ffc8c8", fontWeight: "bold" }}>{inmate.name}</div>
+                                <div style={{ fontSize: 7, color: "#e8b84b", border: "1px solid #e8b84b", padding: "2px 6px" }}>{inmate.type}</div>
+                              </div>
+                              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 8, color: "#a87a7a", marginBottom: 12 }}>
+                                <span>STATUS: <span style={{ color: inmate.status === "INTERROGATION" ? "#e84b4b" : "#4caf50" }}>{inmate.status}</span></span>
+                                <span>INTEL EXTRACTED: <span style={{ color: "#4b9ae8" }}>{inmate.intelYield}%</span></span>
+                              </div>
+                              <div style={{ display: "flex", gap: 6 }}>
+                                <button className="btn btn-red" style={{ flex: 1, fontSize: 8, padding: "6px" }} onClick={() => {
+                                  if (inmate.intelYield >= 100) return notify("SUBJECT EXHAUSTED - NO FURTHER INTEL", "#e84b4b");
+                                  setDetained(prev => prev.map(d => d.id === inmate.id ? { ...d, status: "INTERROGATION", intelYield: Math.min(100, d.intelYield + 15) } : d));
+                                  updateGeneral({ prestige: Math.min(100, pres + 2) });
+                                  notify(`Enhanced Interrogation authorized for ${inmate.name}. +2 PR`, "#e84b4b");
+                                }}>
+                                  🩸 ENHANCED INTERROGATION
+                                </button>
+                                <button className="btn" style={{ flex: 1, fontSize: 8, padding: "6px" }} onClick={() => {
+                                  setDetained(prev => prev.filter(d => d.id !== inmate.id));
+                                  updateGeneral({ approval: Math.min(100, ap + 5) });
+                                  notify(`Prisoner Exchanged / Released: ${inmate.name}. +5 AP`, "#4caf50");
+                                }}>
+                                  🤝 RELEASE / EXCHANGE
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      <div style={{ marginTop: 14, paddingTop: 14, borderTop: "1px solid #2a1a1a", display: "flex", gap: 10 }}>
+                        <button className="btn" style={{ fontSize: 9, borderColor: "#9b59b6", color: "#9b59b6" }} onClick={() => {
+                          const newId = "p" + Date.now();
+                          const types = ["DOMESTIC TERRORIST", "FOREIGN INTELLIGENCE", "POLITICAL RIVAL", "WHISTLEBLOWER"];
+                          const type = types[Math.floor(Math.random() * types.length)];
+                          setDetained(prev => [...prev, { id: newId, name: `N/A (CLASSIFIED - ID ${newId.slice(-4)})`, type, status: "PROCESSING", intelYield: 0 }]);
+                          notify(`New High Value Target detained at Black Site.`, "#9b59b6");
+                        }}>
+                          ⛓️ ORDER NEW ARREST / RENDITION (RANDOM)
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
