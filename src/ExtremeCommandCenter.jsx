@@ -332,11 +332,11 @@ const GLOBAL_EVENTS = [
 ];
 
 const SUBORDINATE_GENERALS = [
-  { id: "sg1", name: "Gen. Marcus Webb", rank: "LTG", unit: "XVIII Airborne Corps", distinction: "Mogadishu veteran. 3 combat tours.", medals: ["DSM", "BSM", "PH"] },
-  { id: "sg2", name: "Adm. Diana Torres", rank: "VADM", unit: "7th Fleet", distinction: "Led Pacific response to Taiwan crisis.", medals: ["LOM", "BSM"] },
-  { id: "sg3", name: "Gen. James Okafor", rank: "MG", unit: "1st Special Forces CMD", distinction: "Green Beret. 18 years SF operations.", medals: ["CAB", "SSM"] },
-  { id: "sg4", name: "Gen. Rachel Kim", rank: "BG", unit: "Space Force Operations", distinction: "Youngest BG in 40 years. MIT engineer.", medals: ["DSM"] },
-  { id: "sg5", name: "Col. Dmitri Volkov", rank: "COL", unit: "Delta Force", distinction: "Born in USSR. Defected 1991. CIA asset.", medals: ["CAB", "BSM", "PH"] },
+  { id: "sg1", name: "Gen. Marcus Webb", rank: "LTG", unit: "XVIII Airborne Corps", distinction: "Mogadishu veteran. 3 combat tours.", medals: ["DSM", "BSM", "PH"], baseLoyalty: 60, faction: "Hawks", trait: "Aggressive" },
+  { id: "sg2", name: "Adm. Diana Torres", rank: "VADM", unit: "7th Fleet", distinction: "Led Pacific response to Taiwan crisis.", medals: ["LOM", "BSM"], baseLoyalty: 75, faction: "Navy Elite", trait: "Strategic" },
+  { id: "sg3", name: "Gen. James Okafor", rank: "MG", unit: "1st Special Forces CMD", distinction: "Green Beret. 18 years SF operations.", medals: ["CAB", "SSM"], baseLoyalty: 85, faction: "Special Ops", trait: "Loyal" },
+  { id: "sg4", name: "Gen. Rachel Kim", rank: "BG", unit: "Space Force Operations", distinction: "Youngest BG in 40 years. MIT engineer.", medals: ["DSM"], baseLoyalty: 50, faction: "Technocrats", trait: "Ambitious" },
+  { id: "sg5", name: "Col. Dmitri Volkov", rank: "COL", unit: "Delta Force", distinction: "Born in USSR. Defected 1991. CIA asset.", medals: ["CAB", "BSM", "PH"], baseLoyalty: 65, faction: "Shadow Ops", trait: "Ruthless" },
 ];
 
 const INITIAL_OFFICERS = [
@@ -909,6 +909,7 @@ export default function GeneralHQ() {
   const [showAward, setShowAward] = useState(null);
   const [showDeploy, setShowDeploy] = useState(null);
   const [selectedZone, setSelectedZone] = useState(null);
+  const [deployPhase, setDeployPhase] = useState(0);
   const [eventResult, setEventResult] = useState(null);
   const [notification, setNotification] = useState(null);
   const [newsTicker, setNewsTicker] = useState(NEWS_FEED);
@@ -952,17 +953,21 @@ export default function GeneralHQ() {
         if (c.progress >= 100) return c;
         const newP = c.progress + (10 + Math.floor(Math.random() * 20));
         if (newP >= 100) {
-          setTimeout(() => {
-            const success = Math.random() > c.risk;
-            if (success) {
+          const success = Math.random() > c.risk;
+          if (success) {
+            const pmcPayout = (c.reward.pr * 15000) + 50000;
+            setTimeout(() => {
               updateGeneral({ prestige: Math.min(100, (general.prestige || 60) + c.reward.pr), approval: Math.min(100, (general.approval || 70) + c.reward.ap) });
-              notify(`SHADOW OP PHOENIX: SUCCESS`, "#4caf50");
-            } else {
+              setBankBalance(b => b + pmcPayout);
+              notify(`✓ ${c.name}: SUCCESS — +$${pmcPayout.toLocaleString()} wired offshore`, "#4caf50");
+            }, 0);
+          } else {
+            setTimeout(() => {
               updateGeneral({ prestige: Math.max(0, (general.prestige || 60) - c.penalty.pr), approval: Math.max(0, (general.approval || 70) - c.penalty.ap) });
-              notify(`SHADOW OP PHOENIX: COMPROMISED. DENY INVOLVEMENT.`, "#e84b4b");
-            }
-          }, 0);
-          return { ...c, progress: 100, status: success ? "SUCCESS" : "COMPROMISED" };
+              notify(`✗ ${c.name}: COMPROMISED — DENY ALL INVOLVEMENT`, "#e84b4b");
+            }, 0);
+          }
+          return { ...c, progress: 100, status: success ? 'SUCCESS' : 'COMPROMISED' };
         }
         return { ...c, progress: newP };
       }));
@@ -992,21 +997,19 @@ export default function GeneralHQ() {
     }
   }, [tick, loaded, nuclearWinter]);
 
-  // Live Mission Seeder — every 45 ticks, seed a new random mission
+  // Map Mission Seeder — replenish hot zones periodically so the user can stay active
   useEffect(() => {
     if (!loaded || nuclearWinter) return;
-    if (tick > 0 && tick % 45 === 0) {
-      // Only seed if < 2 active live missions
-      if (liveMissions.filter(m => !m.resolved).length >= 2) return;
-      const available = LIVE_MISSION_POOL.filter(m => !liveMissions.find(lm => lm.id === m.id));
-      if (available.length === 0) return;
-      const mission = { ...available[Math.floor(Math.random() * available.length)], timeLeft: null, resolved: false, result: null };
-      // Start timer
-      mission.timeLeft = mission.timerSeconds;
-      setLiveMissions(prev => [...prev, mission]);
-      notify(`⚡ NEW CRISIS: ${mission.title} — RESPONSE WINDOW: ${mission.timerSeconds}s`, "#e84b4b");
+    if (tick > 0 && tick % 60 === 0) {
+      const currentHzIds = (general.hotZones || HOT_ZONES).map(z => z.id);
+      const available = HOT_ZONES.filter(z => !currentHzIds.includes(z.id));
+      if (available.length > 0) {
+        const newHz = available[Math.floor(Math.random() * available.length)];
+        updateGeneral({ hotZones: [...(general.hotZones || HOT_ZONES), newHz] });
+        notify(`NEW INTEL: Escalation in ${newHz.name}. Map updated.`, "#e84b4b");
+      }
     }
-  }, [tick, loaded, nuclearWinter, liveMissions]);
+  }, [tick, loaded, nuclearWinter, general.hotZones]);
 
   // Live Mission Countdown — tick timers down, apply econ damage on expiry
   useEffect(() => {
@@ -1159,13 +1162,15 @@ export default function GeneralHQ() {
   useEffect(() => {
     if (!loaded || activeEvent) return;
     if (tick % 45 === 0 && tick > 0) {
-      const available = GLOBAL_EVENTS.filter(e => !general.eventLog.includes(e.id));
-      if (available.length > 0) {
-        const evt = available[Math.floor(Math.random() * available.length)];
-        setActiveEvent(evt);
+      const avgLoyalty = SUBORDINATE_GENERALS.reduce((sum, sg) => sum + Math.min(100, sg.baseLoyalty + ((general.loyaltyDeltas || {})[sg.id] || 0)), 0) / SUBORDINATE_GENERALS.length;
+      if (avgLoyalty < 45 && Math.random() > 0.3 && !(general.eventLog || []).includes("e8")) {
+        setActiveEvent(GLOBAL_EVENTS.find(e => e.id === "e8"));
+        return;
       }
+      // Standard random popups disabled as per commander orders.
+      // Retaining only the Coup threat mechanic.
     }
-  }, [tick, loaded, activeEvent]);
+  }, [tick, loaded, activeEvent, general.loyaltyDeltas, general.eventLog]);
 
   function notify(msg, color = "#4caf50") {
     setNotification({ msg, color });
@@ -1288,30 +1293,68 @@ export default function GeneralHQ() {
   };
 
   function deployUnit(unit, zone) {
+    let branchBudget = branchBudgets.army;
+    if (unit.id === "7thfleet" || unit.id === "seals") branchBudget = branchBudgets.navy;
+    else if (unit.id === "b52") branchBudget = branchBudgets.airforce;
+    else if (unit.id === "1mar") branchBudget = branchBudgets.marines;
+
+    const chanceFail = branchBudget < 120 ? 0.6 : branchBudget < 180 ? 0.3 : 0;
+    if (Math.random() < chanceFail) {
+      notify(`${unit.name} DEPLOYMENT FAILED — SUPPLY SHORTAGE`, "#e84b4b");
+      updateGeneral({ prestige: Math.max(0, (general.prestige || 60) - 5), approval: Math.max(0, (general.approval || 70) - 2) });
+      setShowDeploy(null);
+      setSelectedZone(null);
+      setDeployPhase(0);
+      return;
+    }
+
+    const activeMission = {
+      id: Date.now(),
+      title: `OP: ${zone.name.toUpperCase()} PACIFICATION`,
+      body: `Task Force ${unit.abbr} deployed to ${zone.name}. Operation in progress. Expected contact with hostile elements. Guide the operation from the SITUATION QUEUE to ensure success.`,
+      timerSeconds: 90,
+      timeLeft: 90,
+      resolved: false,
+      result: null,
+      econImpact: { gdpChange: -0.1, label: "Market Instability" },
+      options: [
+        { label: "Standard Rules of Engagement", risk: "MEDIUM", effect: { approval: +5, prestige: +10 }, outcome: `${unit.name} successfully stabilized the region.` },
+        { label: "Aggressive Push (High Risk)", risk: "HIGH", effect: { approval: +10, prestige: +20, bankChange: 25000 }, outcome: `Aggressive tactics secured the zone and seized cartel/insurgent assets.` },
+        { label: "Covert Strike (Low Profile)", risk: "LOW", effect: { approval: 0, prestige: +5 }, outcome: `Operation completed quietly. Minimal political fallout.` }
+      ]
+    };
+    setLiveMissions(prev => [...prev, activeMission]);
+
     const newDep = { unitId: unit.id, unitName: unit.name, zoneName: zone.name, lat: zone.lat, lon: zone.lon, color: zone.color, deployed: new Date().toLocaleDateString() };
     updateGeneral({
       deployments: [...(general.deployments || []), newDep],
       forcesDeployed: (general.forcesDeployed || 140000) + unit.strength,
       activeTheatres: Math.min(8, (general.activeTheatres || 4) + 1),
       prestige: Math.min(100, (general.prestige || 60) + 3),
+      hotZones: (general.hotZones || HOT_ZONES).filter(z => z.id !== zone.id) // Clear map marker
     });
     setShowDeploy(null);
     setSelectedZone(null);
+    setDeployPhase(0);
     notify(`${unit.name} deployed to ${zone.name}`, unit.id === "delta" ? "#e8b84b" : "#4caf50");
   }
 
   function awardMedal(gen2, medal) {
+    if ((general.prestige || 60) < 5) { notify("Insufficient prestige to award medal", "#e84b4b"); return; }
     const key = gen2.id;
     const existing = general.awardedTo || {};
     const genAwards = existing[key] || [];
     if (genAwards.includes(medal.id)) { notify("Already awarded", "#e84b4b"); return; }
+    const existingLoyalty = general.loyaltyDeltas || {};
     updateGeneral({
       awardedTo: { ...existing, [key]: [...genAwards, medal.id] },
+      loyaltyDeltas: { ...existingLoyalty, [key]: (existingLoyalty[key] || 0) + 15 },
       medalsAwarded: (general.medalsAwarded || 0) + 1,
       approval: Math.min(100, (general.approval || 70) + 2),
-      prestige: Math.min(100, (general.prestige || 60) + 2),
+      prestige: Math.max(0, (general.prestige || 60) - 5),
     });
-    notify(`${medal.name} awarded to ${gen2.name}`, medal.color);
+    notify(`${medal.name} awarded to ${gen2.name}. Loyalty +15.`, medal.color);
+    setShowAward(null);
   }
 
   function changeDefcon(d) {
@@ -1499,32 +1542,90 @@ export default function GeneralHQ() {
           </div>
         )}
 
-        {/* DEPLOY MODAL */}
+        {/* DEPLOY MODAL / THEATRE BRIEFING */}
         {showDeploy && selectedZone && (
-          <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.95)", zIndex: 3000, display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <div className="panel" style={{ maxWidth: 600, width: "95%", padding: 28, border: "1px solid #2a4a2a" }}>
+          <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.95)", zIndex: 3000, display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(4px)" }}>
+            <div className="panel" style={{ maxWidth: 650, width: "95%", padding: "32px 40px", border: "1px solid #2a4a2a", boxShadow: "0 0 40px #051505", display: "flex", flexDirection: "column" }}>
               <Corners />
-              <div style={{ fontSize: 9, color: "#3a5a3a", letterSpacing: 4, marginBottom: 8 }}>FORCE DEPLOYMENT</div>
-              <div style={{ fontSize: 14, color: "#c8ffc8", letterSpacing: 4, marginBottom: 4 }}>DEPLOY TO: {selectedZone.name.toUpperCase()}</div>
-              <div style={{ fontSize: 9, color: "#e84b4b", marginBottom: 20 }}>THREAT: {selectedZone.threat} · {selectedZone.description}</div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 20 }}>
-                {UNITS.map(u => (
-                  <div key={u.id} className="choice-card" onClick={() => deployUnit(u, selectedZone)} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderColor: "#1a3a1a" }}>
-                    <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-                      <div style={{ fontSize: 18 }}>{u.icon}</div>
-                      <div>
-                        <div style={{ fontSize: 10, color: "#c8ffc8", letterSpacing: 2 }}>{u.name}</div>
-                        <div style={{ fontSize: 8, color: "#4a6a4a" }}>{u.abbr} · {u.specialty}</div>
+
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 }}>
+                <div>
+                  <div style={{ fontSize: 10, color: "#3a5a3a", letterSpacing: 4, marginBottom: 8, fontFamily: "'Share Tech Mono', monospace" }}>TACTICAL THEATRE BRIEFING // TOP SECRET</div>
+                  <div style={{ fontSize: 24, color: "#c8ffc8", letterSpacing: 6, fontWeight: "bold", fontFamily: "'Oswald', sans-serif", textShadow: "0 0 10px #4caf50aa" }}>{selectedZone.name.toUpperCase()}</div>
+                  <div style={{ fontSize: 10, color: "#5a7a5a", marginTop: 4 }}>COORDINATES: {selectedZone.lat.toFixed(2)}°N, {selectedZone.lon.toFixed(2)}°E</div>
+                </div>
+                <div style={{ textAlign: "right", borderLeft: "2px solid #1a3a1a", paddingLeft: 16 }}>
+                  <div style={{ fontSize: 9, color: "#4a6a4a", letterSpacing: 2 }}>THREAT ASSESSMENT</div>
+                  <div style={{ fontSize: 18, color: selectedZone.color, fontWeight: "bold", letterSpacing: 2, textShadow: `0 0 15px ${selectedZone.color}88` }}>{selectedZone.threat}</div>
+                </div>
+              </div>
+
+              <div style={{ height: 1, background: "linear-gradient(90deg, #4caf50, transparent)", marginBottom: 20 }} />
+
+              {deployPhase === 0 ? (
+                <div style={{ animation: "slideIn 0.3s" }}>
+                  <div style={{ display: "flex", gap: 20, marginBottom: 24 }}>
+                    <div style={{ flex: 1, background: "#050d05", border: "1px solid #1a2a1a", padding: 16, position: "relative" }}>
+                      <div style={{ position: "absolute", top: 0, left: 0, width: 4, height: "100%", background: selectedZone.color }} />
+                      <div style={{ fontSize: 9, color: "#5a7a5a", marginBottom: 8, letterSpacing: 1 }}>SITUATIONAL INTEL</div>
+                      <div style={{ fontSize: 12, color: "#c8ffc8", lineHeight: 1.6 }}><TW text={selectedZone.description} speed={10} /></div>
+                    </div>
+                    <div style={{ width: 180, display: "flex", flexDirection: "column", gap: 10 }}>
+                      <div style={{ background: "#050d05", border: "1px solid #1a2a1a", padding: 12 }}>
+                        <div style={{ fontSize: 8, color: "#4a6a4a" }}>US FORCES IN THEATRE</div>
+                        <div style={{ fontSize: 16, color: "#4caf50", marginTop: 4 }}>{selectedZone.troops.toLocaleString()}</div>
+                      </div>
+                      <div style={{ background: "#050d05", border: "1px solid #1a2a1a", padding: 12 }}>
+                        <div style={{ fontSize: 8, color: "#4a6a4a" }}>EST. ADVERSARY COMBATANTS</div>
+                        <div style={{ fontSize: 16, color: selectedZone.color, marginTop: 4 }}>{Math.floor(selectedZone.troops * (Math.random() * 1.5 + 0.5) + (selectedZone.threat === 'HIGH' ? 50000 : 5000)).toLocaleString()}</div>
                       </div>
                     </div>
-                    <div style={{ textAlign: "right" }}>
-                      <div style={{ fontSize: 9, color: "#4caf50" }}>{u.strength.toLocaleString()} personnel</div>
-                      <div style={{ fontSize: 8, color: "#3a5a3a" }}>{u.theater}</div>
-                    </div>
                   </div>
-                ))}
-              </div>
-              <button className="btn" onClick={() => { setShowDeploy(false); setSelectedZone(null); }}>← CANCEL</button>
+
+                  <div style={{ background: "#020802", border: "1px dashed #2a4a2a", padding: 16, marginBottom: 24, textAlign: "center" }}>
+                    <div style={{ fontSize: 9, color: "#5a7a5a", marginBottom: 8 }}>SATELLITE IMAGERY UPLINK // NRO KH-11</div>
+                    <div style={{ color: "#2a4a2a", fontSize: 10, letterSpacing: 4, fontFamily: "monospace" }}>[ ENCRYPTED FEED ESTABLISHED ]</div>
+                    <div style={{ color: "#3a5a3a", fontSize: 8, marginTop: 4, animation: "pulse 2s infinite" }}>AWAITING COMMAND AUTHORITY TO COMMENCE OPS</div>
+                  </div>
+
+                  <div style={{ display: "flex", gap: 12 }}>
+                    <button className="btn" style={{ flex: 1, fontSize: 12, padding: 14, background: "#0a1f0a", borderColor: "#4caf50", color: "#c8ffc8" }} onClick={() => setDeployPhase(1)}>AUTHORIZE TASK FORCE DEPLOYMENT ➔</button>
+                    <button className="btn" style={{ padding: "14px 24px" }} onClick={() => { setShowDeploy(false); setSelectedZone(null); }}>CANCEL</button>
+                  </div>
+                </div>
+              ) : (
+                <div style={{ animation: "fadeUp 0.3s" }}>
+                  <div style={{ fontSize: 10, color: "#e8b84b", marginBottom: 12, letterSpacing: 2 }}>SELECT UNIT FOR DEPLOYMENT</div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 20, maxHeight: 300, overflowY: "auto", paddingRight: 8 }}>
+                    {UNITS.map(u => {
+                      let bb = branchBudgets.army;
+                      if (u.id === "7thfleet" || u.id === "seals") bb = branchBudgets.navy;
+                      else if (u.id === "b52") bb = branchBudgets.airforce;
+                      else if (u.id === "1mar") bb = branchBudgets.marines;
+                      const isReady = bb >= 180;
+                      return (
+                        <div key={u.id} className="choice-card" onClick={() => { deployUnit(u, selectedZone); }} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderColor: isReady ? "#1a3a1a" : "#e84b4b55" }}>
+                          <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+                            <div style={{ fontSize: 20, width: 30, textAlign: "center", textShadow: `0 0 10px ${isReady ? '#4caf50' : '#e84b4b'}` }}>{u.icon}</div>
+                            <div>
+                              <div style={{ fontSize: 12, color: isReady ? "#c8ffc8" : "#e84b4b", letterSpacing: 2 }}>{u.name} {isReady ? "" : "⚠"}</div>
+                              <div style={{ fontSize: 9, color: "#4a6a4a", marginTop: 2 }}>{u.abbr} · {u.specialty}</div>
+                            </div>
+                          </div>
+                          <div style={{ textAlign: "right" }}>
+                            <div style={{ fontSize: 11, color: isReady ? "#4caf50" : "#e8b84b" }}>{isReady ? u.strength.toLocaleString() + " forces" : "SUPPLY SHORTAGE"}</div>
+                            <div style={{ fontSize: 8, color: "#3a5a3a", marginTop: 2 }}>BASE: {u.theater.toUpperCase()}</div>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                  <div style={{ display: "flex", gap: 12 }}>
+                    <button className="btn" style={{ padding: "10px 24px" }} onClick={() => setDeployPhase(0)}>← BACK TO BRIEFING</button>
+                    <button className="btn btn-red" style={{ padding: "10px 24px" }} onClick={() => { setShowDeploy(false); setSelectedZone(null); setDeployPhase(0); }}>ABORT DEPLOYMENT</button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -1685,7 +1786,7 @@ export default function GeneralHQ() {
                     zones={general.hotZones || HOT_ZONES}
                     deployments={general.deployments || []}
                     liveMissions={liveMissions.filter(m => !m.resolved)}
-                    onZoneClick={(z) => { setSelectedZone(z); setShowDeploy(true); }}
+                    onZoneClick={(z) => { setSelectedZone(z); setDeployPhase(0); setShowDeploy(true); }}
                     onMissionClick={(m) => { setActiveLiveMission(m); setTab("missions"); }}
                   />
                   <div style={{ fontSize: 8, color: "#2a4a2a", marginTop: 6 }}>CLICK ⚠ HOT ZONE TO DEPLOY · CLICK ⚡ CRISIS MARKER TO RESPOND · PLACE TACTICAL PINS USING TOOLBAR</div>
@@ -1714,67 +1815,91 @@ export default function GeneralHQ() {
               <div style={{ animation: "fadeUp 0.3s" }}>
                 <div style={{ fontSize: 9, color: "#3a5a3a", letterSpacing: 4, marginBottom: 14 }}>◈ COMMAND AUTHORITY — ALL SPECIAL OPERATIONS FORCES</div>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(280px,1fr))", gap: 10, marginBottom: 20 }}>
-                  {UNITS.map(u => (
-                    <div key={u.id} className="panel" style={{ padding: 18, border: "1px solid #1a3a1a" }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 12, alignItems: "flex-start" }}>
-                        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-                          <div style={{ fontSize: 26 }}>{u.icon}</div>
-                          <div>
-                            <div style={{ fontSize: 12, color: "#c8ffc8", letterSpacing: 2 }}>{u.name}</div>
-                            <div style={{ fontSize: 8, color: "#3a5a3a", letterSpacing: 2 }}>{u.abbr}</div>
+                  {UNITS.map(u => {
+                    let branchBudget = branchBudgets.army;
+                    if (u.id === "7thfleet" || u.id === "seals") branchBudget = branchBudgets.navy;
+                    else if (u.id === "b52") branchBudget = branchBudgets.airforce;
+                    else if (u.id === "1mar") branchBudget = branchBudgets.marines;
+
+                    const readiness = branchBudget < 120 ? { status: "CRITICAL SHORTAGE", color: "#e84b4b", pct: 30 } :
+                      branchBudget < 180 ? { status: "SUPPLY SHORTAGE", color: "#e8b84b", pct: 60 } :
+                        { status: "COMBAT READY", color: "#4caf50", pct: 85 + Math.random() * 15 };
+
+                    return (
+                      <div key={u.id} className="panel" style={{ padding: 18, border: `1px solid ${readiness.color}44` }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 12, alignItems: "flex-start" }}>
+                          <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                            <div style={{ fontSize: 26, color: readiness.color }}>{u.icon}</div>
+                            <div>
+                              <div style={{ fontSize: 12, color: "#c8ffc8", letterSpacing: 2 }}>{u.name}</div>
+                              <div style={{ fontSize: 8, color: "#3a5a3a", letterSpacing: 2 }}>{u.abbr}</div>
+                            </div>
+                          </div>
+                          <div style={{ fontSize: 8, background: "#0a1a0a", border: "1px solid #1a3a1a", padding: "3px 8px", color: "#4a7a4a" }}>{u.theater}</div>
+                        </div>
+                        <div style={{ marginBottom: 10 }}>
+                          <div style={{ fontSize: 9, color: "#4caf50", marginBottom: 2 }}>{u.strength.toLocaleString()} personnel</div>
+                          <div style={{ fontSize: 9, color: "#4a6a4a" }}>{u.specialty}</div>
+                        </div>
+                        {/* Readiness bar */}
+                        <div style={{ marginBottom: 12 }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 8, color: "#3a5a3a", marginBottom: 4 }}>
+                            <span>READINESS</span><span style={{ color: readiness.color }}>{readiness.status}</span>
+                          </div>
+                          <div style={{ height: 3, background: "#0d1a0d", borderRadius: 2 }}>
+                            <div style={{ height: "100%", width: `${readiness.pct}%`, background: readiness.color, borderRadius: 2, transition: "width 0.5s" }} />
                           </div>
                         </div>
-                        <div style={{ fontSize: 8, background: "#0a1a0a", border: "1px solid #1a3a1a", padding: "3px 8px", color: "#4a7a4a" }}>{u.theater}</div>
-                      </div>
-                      <div style={{ marginBottom: 10 }}>
-                        <div style={{ fontSize: 9, color: "#4caf50", marginBottom: 2 }}>{u.strength.toLocaleString()} personnel</div>
-                        <div style={{ fontSize: 9, color: "#4a6a4a" }}>{u.specialty}</div>
-                      </div>
-                      {/* Readiness bar */}
-                      <div style={{ marginBottom: 12 }}>
-                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 8, color: "#3a5a3a", marginBottom: 4 }}>
-                          <span>READINESS</span><span style={{ color: "#4caf50" }}>COMBAT READY</span>
-                        </div>
-                        <div style={{ height: 3, background: "#0d1a0d", borderRadius: 2 }}>
-                          <div style={{ height: "100%", width: `${85 + Math.random() * 15 | 0}%`, background: "linear-gradient(90deg,#2d7a2d,#4caf50)", borderRadius: 2 }} />
+                        <div style={{ display: "flex", gap: 6 }}>
+                          <button className="btn" style={{ flex: 1, fontSize: 9, padding: "6px 8px" }} onClick={() => { if (general.hotZones?.length) { setSelectedZone(general.hotZones[0]); setDeployPhase(0); setShowDeploy(true); } }}>
+                            ⚡ DEPLOY
+                          </button>
+                          <button className="btn btn-gold" style={{ flex: 1, fontSize: 9, padding: "6px 8px" }} onClick={() => notify(`${u.name} status: ${readiness.status}`)}>
+                            📋 BRIEF
+                          </button>
                         </div>
                       </div>
-                      <div style={{ display: "flex", gap: 6 }}>
-                        <button className="btn" style={{ flex: 1, fontSize: 9, padding: "6px 8px" }} onClick={() => { if (general.hotZones?.length) { setSelectedZone(general.hotZones[0]); setShowDeploy(true); } }}>
-                          ⚡ DEPLOY
-                        </button>
-                        <button className="btn btn-gold" style={{ flex: 1, fontSize: 9, padding: "6px 8px" }} onClick={() => notify(`${u.name} on standby — mission readiness confirmed`)}>
-                          📋 BRIEF
-                        </button>
-                      </div>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
 
                 {/* Subordinate Generals */}
                 <div style={{ fontSize: 9, color: "#3a5a3a", letterSpacing: 4, marginBottom: 12 }}>◈ SUBORDINATE COMMANDERS</div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                  {SUBORDINATE_GENERALS.map(sg => (
-                    <div key={sg.id} className="panel" style={{ padding: 16, display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
-                      <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-                        <div style={{ width: 44, height: 44, border: "1px solid #2a4a2a", background: "#050d05", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, color: "#4caf50", fontFamily: "Oswald,sans-serif" }}>{sg.rank}</div>
-                        <div>
-                          <div style={{ fontSize: 12, color: "#c8ffc8", letterSpacing: 2 }}>{sg.name}</div>
-                          <div style={{ fontSize: 9, color: "#3a5a3a" }}>{sg.unit}</div>
-                          <div style={{ fontSize: 8, color: "#2a4a2a", marginTop: 3, fontStyle: "italic" }}>{sg.distinction}</div>
+                  {SUBORDINATE_GENERALS.map(sg => {
+                    const loyalty = Math.min(100, sg.baseLoyalty + ((general.loyaltyDeltas || {})[sg.id] || 0));
+                    return (
+                      <div key={sg.id} className="panel" style={{ padding: 16, display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
+                        <div style={{ display: "flex", gap: 12, alignItems: "stretch", width: "100%", maxWidth: 360 }}>
+                          <div style={{ width: 44, height: 44, border: "1px solid #2a4a2a", background: "#050d05", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, color: "#4caf50", fontFamily: "Oswald,sans-serif", alignSelf: "center" }}>{sg.rank}</div>
+                          <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+                            <div>
+                              <div style={{ fontSize: 12, color: "#c8ffc8", letterSpacing: 2 }}>{sg.name}</div>
+                              <div style={{ fontSize: 9, color: "#3a5a3a" }}>{sg.unit} · {sg.faction}</div>
+                              <div style={{ fontSize: 8, color: "#2a4a2a", marginTop: 3, fontStyle: "italic" }}>{sg.distinction} · {sg.trait}</div>
+                            </div>
+                            <div style={{ marginTop: 6 }}>
+                              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 8, color: loyalty < 45 ? "#e84b4b" : "#4caf50", marginBottom: 2 }}>
+                                <span>LOYALTY</span><span>{loyalty}%</span>
+                              </div>
+                              <div style={{ height: 3, background: "#1a2a1a" }}>
+                                <div style={{ height: "100%", width: `${loyalty}%`, background: loyalty < 45 ? "#e84b4b" : loyalty < 60 ? "#e8b84b" : "#4caf50", transition: "width 0.5s" }} />
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                        <div style={{ display: "flex", gap: 6, alignItems: "flex-end", flexDirection: "column", flexShrink: 0 }}>
+                          <div style={{ display: "flex", gap: 3, marginBottom: 4 }}>
+                            {((general.awardedTo || {})[sg.id] || [...sg.medals]).map((m, i) => {
+                              const medal = MEDAL_LIST.find(ml => ml.id === m.toLowerCase()) || MEDAL_LIST[i % MEDAL_LIST.length];
+                              return <div key={i} title={m} style={{ width: 14, height: 9, background: medal?.color + "99", border: `1px solid ${medal?.color || "#3a3a3a"}` }} />;
+                            })}
+                          </div>
+                          <button className="btn btn-gold" style={{ fontSize: 9, padding: "5px 12px" }} onClick={() => setShowAward(sg)}>🏅 AWARD (5 PR)</button>
                         </div>
                       </div>
-                      <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
-                        <div style={{ display: "flex", gap: 3 }}>
-                          {((general.awardedTo || {})[sg.id] || [...sg.medals]).map((m, i) => {
-                            const medal = MEDAL_LIST.find(ml => ml.id === m.toLowerCase()) || MEDAL_LIST[i % MEDAL_LIST.length];
-                            return <div key={i} title={m} style={{ width: 14, height: 9, background: medal?.color + "99", border: `1px solid ${medal?.color || "#3a3a3a"}` }} />;
-                          })}
-                        </div>
-                        <button className="btn btn-gold" style={{ fontSize: 9, padding: "5px 12px" }} onClick={() => setShowAward(sg)}>🏅 AWARD</button>
-                      </div>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               </div>
             )}
@@ -1892,7 +2017,7 @@ export default function GeneralHQ() {
                         <div style={{ fontSize: 10, color: "#5a7a5a", lineHeight: 1.8, marginBottom: 8 }}>{z.description}</div>
                         <div style={{ display: "flex", gap: 8 }}>
                           <div style={{ fontSize: 8, color: "#3a5a3a" }}>👥 {z.troops.toLocaleString()} US forces</div>
-                          <button className="btn" style={{ fontSize: 8, padding: "3px 10px", marginLeft: "auto" }} onClick={() => { setSelectedZone(z); setShowDeploy(true); }}>DEPLOY</button>
+                          <button className="btn" style={{ fontSize: 8, padding: "3px 10px", marginLeft: "auto" }} onClick={() => { setSelectedZone(z); setDeployPhase(0); setShowDeploy(true); }}>DEPLOY</button>
                         </div>
                       </div>
                     ))}
@@ -2791,16 +2916,40 @@ export default function GeneralHQ() {
                       <div style={{ fontSize: 42, color: "#ffd700", fontFamily: "Oswald,sans-serif", letterSpacing: 2, textShadow: "0 0 20px #ffd70066" }}>
                         ${bankBalance.toLocaleString()}
                       </div>
-                      <div style={{ fontSize: 8, color: "#5a5a3a", marginTop: 4 }}>Base Salary: $25,000/tick · POTUS Authorization Clearance</div>
+                      <div style={{ fontSize: 8, color: "#5a5a3a", marginTop: 4 }}>Base Salary: $25,000/tick · PMC Contract Bonuses Apply</div>
                     </div>
+
+                    {purchases.length > 0 && (
+                      <div className="panel" style={{ padding: 12, marginBottom: 12, borderColor: "#ffd70033" }}>
+                        <div style={{ fontSize: 8, color: "#7a6a3a", letterSpacing: 2, marginBottom: 6 }}>◈ ACTIVE LIFESTYLE PERKS</div>
+                        {[
+                          { item: "Georgetown Mansion Rent", buff: "+$5,000/tick passive income" },
+                          { item: "Lobbyist Extravaganza", buff: "+1 AP/tick auto-regeneration" },
+                          { item: "Private Security Detail", buff: "Immune to domestic assassination events" },
+                          { item: "Swiss Bank Account", buff: "Salary doubles automatically" },
+                          { item: "Private Cayman Island", buff: "Full financial immunity from investigations" },
+                          { item: "Château de Luxe (Paris)", buff: "Diplomatic meetings grant +5 AP" },
+                          { item: "Political Patron Network", buff: "POTUS approval events trigger bonus +5 AP" },
+                        ].filter(b => purchases.includes(b.item)).map(b => (
+                          <div key={b.item} style={{ fontSize: 8, color: "#c8b870", marginBottom: 3 }}>✓ {b.item} — <span style={{ color: "#4caf50" }}>{b.buff}</span></div>
+                        ))}
+                      </div>
+                    )}
+
                     <div style={{ fontSize: 9, color: "#7a6a3a", letterSpacing: 2, marginBottom: 8 }}>PRESTIGE EXPENDITURES:</div>
                     {[
-                      { item: "Vintage Cuban Cigars", cost: 2000, desc: "For the Situation Room. (+1 PR)", pr: 1, ap: 0 },
-                      { item: "Georgetown Mansion Rent", cost: 15000, desc: "Impress senators at dinner. (+3 PR, +2 AP)", pr: 3, ap: 2 },
-                      { item: "Lobbyist Extravaganza", cost: 45000, desc: "Throw a massive secret gala. (+10 AP)", pr: 0, ap: 10 },
-                      { item: "Custom Pentagon Office", cost: 80000, desc: "Gold-plated everything. (+8 PR)", pr: 8, ap: 0 },
-                      { item: "Private Security Detail", cost: 120000, desc: "Ex-Delta operators. (+5 PR, +5 AP)", pr: 5, ap: 5 },
-                      { item: "Private Cayman Island", cost: 250000, desc: "Ultimate exit strategy. (+25 PR)", pr: 25, ap: 0 },
+                      { item: "Vintage Cuban Cigars", cost: 2000, desc: "Impress the Joint Chiefs. +1 PR", pr: 1, ap: 0 },
+                      { item: "Georgetown Mansion Rent", cost: 15000, desc: "For senator dinners. +$5,000/tick passive. +3 PR, +2 AP", pr: 3, ap: 2 },
+                      { item: "Lobbyist Extravaganza", cost: 45000, desc: "A secret Capitol gala. +10 AP, +1 AP/tick regen", pr: 0, ap: 10 },
+                      { item: "Custom Pentagon Office", cost: 80000, desc: "Gold-plated, imposing. +8 PR", pr: 8, ap: 0 },
+                      { item: "Private Security Detail", cost: 120000, desc: "Ex-Delta operators. +5 PR, +5 AP, domestic threat immunity", pr: 5, ap: 5 },
+                      { item: "Swiss Bank Account", cost: 150000, desc: "Double salary streams. Salary now $50k/tick.", pr: 0, ap: 0 },
+                      { item: "JSOC Liaison Dinner Circuit", cost: 180000, desc: "Dinner with every combatant commander. +15 PR", pr: 15, ap: 0 },
+                      { item: "Château de Luxe (Paris)", cost: 200000, desc: "Known diplomats envy your access. +12 AP per diplomatic meeting", pr: 10, ap: 8 },
+                      { item: "Political Patron Network", cost: 250000, desc: "Senators and Reps groomed over time. +15 AP, POTUS events +5 bonus AP", pr: 5, ap: 15 },
+                      { item: "Private Cayman Island", cost: 400000, desc: "Ultimate exit strategy. +25 PR, full financial immunity", pr: 25, ap: 0 },
+                      { item: "Offshore Armaments Cache", cost: 500000, desc: "Black-market weapons stockpile. Enables armed personal militia option.", pr: 20, ap: 0 },
+                      { item: "Pentagon Art Collection", cost: 50000, desc: "Rare art officially donated, privately enjoyed. +6 PR", pr: 6, ap: 0 },
                     ].map(p => {
                       const owned = purchases.includes(p.item);
                       return (
@@ -2809,7 +2958,7 @@ export default function GeneralHQ() {
                           if (bankBalance >= p.cost) {
                             setBankBalance(b => b - p.cost);
                             setPurchases(prev => [...prev, p.item]);
-                            notify(`Purchased: ${p.item}`, "#ffd700");
+                            notify(`Acquired: ${p.item}`, "#ffd700");
                             updateGeneral({ prestige: Math.min(100, pres + p.pr), approval: Math.min(100, ap + p.ap) });
                           } else {
                             notify("INSUFFICIENT FUNDS", "#e84b4b");
@@ -2820,7 +2969,7 @@ export default function GeneralHQ() {
                               <div style={{ fontSize: 11, color: owned ? "#ffd700" : "#c8b870", letterSpacing: 1 }}>{p.item}</div>
                               <div style={{ fontSize: 8, color: "#5a5a3a", marginTop: 2 }}>{p.desc}</div>
                             </div>
-                            <div style={{ fontSize: 10, color: owned ? "#4caf50" : bankBalance >= p.cost ? "#ffd700" : "#e84b4b", fontFamily: "Oswald,sans-serif" }}>
+                            <div style={{ fontSize: 10, color: owned ? "#4caf50" : bankBalance >= p.cost ? "#ffd700" : "#e84b4b", fontFamily: "Oswald,sans-serif", flexShrink: 0, marginLeft: 8 }}>
                               {owned ? "OWNED" : `$${p.cost.toLocaleString()}`}
                             </div>
                           </div>
@@ -2828,50 +2977,134 @@ export default function GeneralHQ() {
                       );
                     })}
                   </div>
-                  <div>
-                    <div style={{ fontSize: 9, color: "#8aaa7a", letterSpacing: 4, marginBottom: 12 }}>◈ QUARTERS INVENTORY</div>
-                    <div className="panel" style={{ padding: 16, border: "1px solid #1a2a1a", minHeight: 120, marginBottom: 14 }}>
-                      {purchases.length === 0 ? (
-                        <div style={{ fontSize: 9, color: "#3a5a3a", fontStyle: "italic", textAlign: "center", marginTop: 20 }}>You live a Spartan life. No luxuries acquired yet.</div>
-                      ) : (
-                        <ul style={{ paddingLeft: 16, margin: 0 }}>
-                          {purchases.map(p => (
-                            <li key={p} style={{ fontSize: 10, color: "#c8ffc8", marginBottom: 8, letterSpacing: 1 }}>{p}</li>
-                          ))}
-                        </ul>
-                      )}
-                    </div>
 
-                    <div style={{ fontSize: 9, color: "#4b9ae8", letterSpacing: 4, marginBottom: 12 }}>◈ PRIVATE MILITARY HOLDINGS</div>
-                    <div className="panel" style={{ padding: 16, border: "1px solid #1a2a4a", background: "#050a15" }}>
+                  <div>
+                    <div style={{ fontSize: 9, color: "#4b9ae8", letterSpacing: 4, marginBottom: 12 }}>◈ PMC COMMAND CENTER — AEGIS SOLUTIONS</div>
+                    <div className="panel" style={{ padding: 16, border: "1px solid #1a2a4a", background: "#050a15", marginBottom: 14 }}>
                       {!general.ownsPMC ? (
                         <div style={{ textAlign: "center", padding: 10 }}>
-                          <div style={{ fontSize: 11, color: "#4b9ae8", marginBottom: 8 }}>ESTABLISH SHELL PMC ($50,000)</div>
-                          <div style={{ fontSize: 8, color: "#5a7a9a", marginBottom: 16, lineHeight: 1.5 }}>Use personal funds to establish a Private Military Company via shell corporations in Cyprus. This allows you to bid on US defense contracts and earn massive black budget profits.</div>
+                          <div style={{ fontSize: 24, marginBottom: 8 }}>🏴</div>
+                          <div style={{ fontSize: 13, color: "#4b9ae8", marginBottom: 8, letterSpacing: 2 }}>ESTABLISH SHELL PMC</div>
+                          <div style={{ fontSize: 8, color: "#5a7a9a", marginBottom: 16, lineHeight: 1.7 }}>
+                            Incorporate <strong style={{ color: "#c8ffc8" }}>Aegis Solutions LLC</strong> via Cyprus shell corporations. Unlocks DoD contract bidding, off-ledger operations, and personal wealth extraction pipelines from the defense budget.
+                          </div>
+                          <div style={{ fontSize: 10, color: "#ffd700", marginBottom: 12, fontFamily: "Oswald,sans-serif" }}>ESTABLISHMENT COST: $50,000</div>
                           <button className="btn" style={{ borderColor: "#4b9ae8", color: "#4b9ae8", width: "100%" }} onClick={() => {
                             if (bankBalance >= 50000) {
                               setBankBalance(b => b - 50000);
-                              updateGeneral({ ownsPMC: true });
-                              notify("SHADOW PMC ESTABLISHED: AEGIS SOLUTIONS", "#4b9ae8");
+                              updateGeneral({ ownsPMC: true, pmcStats: { name: "Aegis Solutions LLC", rep: 10, funds: 0, tier: 1, contractors: 50, drones: 0 } });
+                              notify("SHADOW PMC ESTABLISHED: AEGIS SOLUTIONS LLC — DoD Clearance Level V acquired.", "#4b9ae8");
                             } else {
                               notify("INSUFFICIENT PERSONAL FUNDS", "#e84b4b");
                             }
-                          }}>AUTHORIZE WIRE TRANSFER</button>
+                          }}>AUTHORIZE WIRE TRANSFER → NICOSIA, CYPRUS</button>
                         </div>
                       ) : (
                         <div>
-                          <div style={{ fontSize: 14, color: "#c8ffc8", letterSpacing: 2, marginBottom: 4 }}>{general.pmcStats.name.toUpperCase()}</div>
-                          <div style={{ fontSize: 8, color: "#5a7a9a", marginBottom: 16 }}>OFFSHORE HOLDING COMPANY · DoD CLEARANCE L-V</div>
-                          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-                            <span style={{ fontSize: 9, color: "#7a9a7a" }}>PMC REPUTATION</span>
-                            <span style={{ fontSize: 10, color: "#4caf50" }}>{general.pmcStats.rep}/100</span>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14, paddingBottom: 10, borderBottom: "1px solid #1a2a4a" }}>
+                            <div>
+                              <div style={{ fontSize: 16, color: "#c8ffc8", letterSpacing: 3, fontFamily: "Oswald,sans-serif" }}>{(general.pmcStats?.name || "AEGIS SOLUTIONS").toUpperCase()}</div>
+                              <div style={{ fontSize: 8, color: "#5a7a9a", marginTop: 2 }}>OFFSHORE HOLDING · DoD CLEARANCE L-V · TIER {general.pmcStats?.tier || 1}</div>
+                            </div>
+                            <div style={{ textAlign: "right" }}>
+                              <div style={{ fontSize: 20, color: "#ffd700", fontFamily: "Oswald,sans-serif" }}>${bankBalance.toLocaleString()}</div>
+                              <div style={{ fontSize: 7, color: "#5a5a3a" }}>PERSONAL ACCOUNTS</div>
+                            </div>
                           </div>
-                          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 16 }}>
-                            <span style={{ fontSize: 9, color: "#7a9a7a" }}>OFFSHORE ACCOUNTS</span>
-                            <span style={{ fontSize: 12, color: "#ffd700", fontFamily: "Oswald,sans-serif" }}>${(general.pmcStats.funds || 0).toLocaleString()}</span>
+
+                          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 14 }}>
+                            {[
+                              { label: "REPUTATION", val: (general.pmcStats?.rep || 10) + "/100", color: "#4caf50" },
+                              { label: "CONTRACTORS", val: general.pmcStats?.contractors || 50, color: "#4b9ae8" },
+                              { label: "DRONES", val: general.pmcStats?.drones || 0, color: "#e8b84b" },
+                            ].map(s => (
+                              <div key={s.label} style={{ background: "#0a1020", border: "1px solid #1a2a4a", padding: "8px 10px", textAlign: "center" }}>
+                                <div style={{ fontSize: 16, color: s.color, fontFamily: "Oswald,sans-serif" }}>{s.val}</div>
+                                <div style={{ fontSize: 7, color: "#4a6a7a", letterSpacing: 1 }}>{s.label}</div>
+                              </div>
+                            ))}
                           </div>
-                          <div style={{ fontSize: 8, color: "#4a5a4a", fontStyle: "italic", textAlign: "center" }}>Go to SHADOW OPS to bid on DoD contracts with your PMC.</div>
+
+                          <div style={{ fontSize: 8, color: "#4b9ae8", letterSpacing: 2, marginBottom: 8 }}>PMC CAPABILITY UPGRADES</div>
+                          {[
+                            { id: "u1", label: "Recruit 50 Elite Contractors", cost: 75000, effect: "contractors +50, +10 Rep", icon: "🪖" },
+                            { id: "u2", label: "Acquire 10 Reaper Drones", cost: 120000, effect: "drones +10, mission success rate +15%", icon: "🚁" },
+                            { id: "u3", label: "Establish Lagos Safe House", cost: 50000, effect: "+5 Rep, Africa ops cost -20%", icon: "🏠" },
+                            { id: "u4", label: "Purchase Untraceable Transport Fleet", cost: 90000, effect: "Extraction missions auto-succeed", icon: "✈️" },
+                            { id: "u5", label: "Tier 2 DoD Security Clearance", cost: 200000, effect: "Higher-value DoD contracts unlocked", icon: "🏛" },
+                          ].map(upg => {
+                            const owned = (general.pmcUpgrades || []).includes(upg.id);
+                            return (
+                              <div key={upg.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 10px", marginBottom: 6, background: owned ? "#050d05" : "#050a15", border: `1px solid ${owned ? "#4caf5044" : "#1a2a4a"}` }}>
+                                <div>
+                                  <div style={{ fontSize: 10, color: owned ? "#4caf50" : "#c8ffc8" }}>{upg.icon} {upg.label}</div>
+                                  <div style={{ fontSize: 8, color: "#4a7a9a", marginTop: 2 }}>{upg.effect}</div>
+                                </div>
+                                {owned ? (
+                                  <div style={{ fontSize: 8, color: "#4caf50", letterSpacing: 2 }}>✓ ACTIVE</div>
+                                ) : (
+                                  <button className="btn" style={{ fontSize: 8, padding: "4px 10px", borderColor: bankBalance >= upg.cost ? "#4b9ae8" : "#e84b4b", color: bankBalance >= upg.cost ? "#4b9ae8" : "#e84b4b" }}
+                                    onClick={() => {
+                                      if (bankBalance < upg.cost) { notify("INSUFFICIENT FUNDS", "#e84b4b"); return; }
+                                      setBankBalance(b => b - upg.cost);
+                                      updateGeneral({ pmcUpgrades: [...(general.pmcUpgrades || []), upg.id], pmcStats: { ...general.pmcStats, rep: Math.min(100, (general.pmcStats?.rep || 10) + 10), contractors: (general.pmcStats?.contractors || 50) + (upg.id === "u1" ? 50 : 0), drones: (general.pmcStats?.drones || 0) + (upg.id === "u2" ? 10 : 0) } });
+                                      notify(`PMC UPGRADE: ${upg.label}`, "#4b9ae8");
+                                    }}>
+                                    ${upg.cost.toLocaleString()}
+                                  </button>
+                                )}
+                              </div>
+                            );
+                          })}
+
+                          <div style={{ fontSize: 8, color: "#ffd700", letterSpacing: 2, marginTop: 14, marginBottom: 8 }}>DoD CONTRACT BIDDING — BUDGET EXTRACTION</div>
+                          {[
+                            { id: "dod1", label: "Base Security — Bagram", value: 80000, risk: 0.1, desc: "Low risk, steady payout." },
+                            { id: "dod2", label: "SOCOM Logistics — Qatar", value: 180000, risk: 0.2, desc: "Off-ledger SOCOM supply chain." },
+                            { id: "dod3", label: "Counter-IED Training — Iraq", value: 250000, risk: 0.25, desc: "Inflated invoices, no questions." },
+                            { id: "dod4", label: "Armed Escort — Hormuz", value: 350000, risk: 0.3, desc: "Navy looks the other way." },
+                            { id: "dod5", label: "Deep Cover Surveillance — Yemen", value: 500000, risk: 0.4, desc: "Classified JSOC tasking. High exposure." },
+                          ].map(contract => {
+                            const isBid = (general.dodContracts || []).includes(contract.id);
+                            return (
+                              <div key={contract.id} style={{ padding: "8px 12px", marginBottom: 6, border: `1px solid ${isBid ? "#ffd70033" : "#1a2000"}`, background: "#080800" }}>
+                                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                                  <div style={{ fontSize: 10, color: isBid ? "#4caf50" : "#c8b870" }}>{contract.label}</div>
+                                  <div style={{ fontSize: 10, color: "#ffd700", fontFamily: "Oswald,sans-serif" }}>${contract.value.toLocaleString()}</div>
+                                </div>
+                                <div style={{ fontSize: 8, color: "#5a5a3a", marginBottom: 6 }}>{contract.desc} · Risk: <span style={{ color: contract.risk > 0.3 ? "#e84b4b" : "#e8b84b" }}>{Math.round(contract.risk * 100)}%</span></div>
+                                {isBid ? (
+                                  <div style={{ fontSize: 8, color: "#4caf50", letterSpacing: 2 }}>✓ FUNDS DEPOSITED</div>
+                                ) : (
+                                  <button className="btn btn-gold" style={{ fontSize: 8, padding: "4px 12px", width: "100%" }}
+                                    onClick={() => {
+                                      const success = Math.random() > contract.risk;
+                                      if (success) {
+                                        setBankBalance(b => b + contract.value);
+                                        updateGeneral({ dodContracts: [...(general.dodContracts || []), contract.id], pmcStats: { ...general.pmcStats, rep: Math.min(100, (general.pmcStats?.rep || 10) + 5) } });
+                                        notify(`DoD Contract Won: +$${contract.value.toLocaleString()} deposited`, "#ffd700");
+                                      } else {
+                                        notify("Contract bid rejected — oversight flagged. Lay low.", "#e84b4b");
+                                      }
+                                    }}>▶ BID ON CONTRACT</button>
+                                )}
+                              </div>
+                            );
+                          })}
                         </div>
+                      )}
+                    </div>
+
+                    <div style={{ fontSize: 9, color: "#8aaa7a", letterSpacing: 4, marginBottom: 10 }}>◈ ACQUIRED ASSETS INVENTORY</div>
+                    <div className="panel" style={{ padding: 16, border: "1px solid #1a2a1a", minHeight: 80 }}>
+                      {purchases.length === 0 ? (
+                        <div style={{ fontSize: 9, color: "#3a5a3a", fontStyle: "italic", textAlign: "center", marginTop: 16 }}>You live a Spartan life. No luxuries acquired.</div>
+                      ) : (
+                        <ul style={{ paddingLeft: 14, margin: 0 }}>
+                          {purchases.map(p => (
+                            <li key={p} style={{ fontSize: 10, color: "#c8b870", marginBottom: 6, letterSpacing: 1 }}>🏆 {p}</li>
+                          ))}
+                        </ul>
                       )}
                     </div>
                   </div>
