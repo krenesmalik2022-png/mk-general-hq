@@ -1715,7 +1715,7 @@ export default function GeneralHQ() {
           <NewsTicker items={newsTicker} />
 
           {/* TABS */}
-          <div style={{ background: "#050a05", borderBottom: "1px solid #1a2a1a", padding: "0 16px", display: "flex", gap: 0, overflowX: "auto" }}>
+          <div style={{ background: "#050a05", borderBottom: "1px solid #1a2a1a", padding: "0 16px", display: "flex", flexWrap: "wrap", gap: 0 }}>
             {[
               { id: "situation", label: "🌍 NMCC" },
               { id: "forces", label: "⚡ FORCE COMMAND" },
