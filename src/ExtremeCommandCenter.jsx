@@ -294,6 +294,24 @@ async function writeSave(data) {
 }
 
 /* ═══════════════════════════ STATIC DATA ═══════════════════════════════════ */
+const PRESTIGE_ASSETS = [
+  { id: "cigars", item: "Vintage Cuban Cigars", type: "Luxury", icon: "🚬", cost: 2000, desc: "Impress the Joint Chiefs. +1 PR", pr: 1, ap: 0 },
+  { id: "art", item: "Pentagon Art Collection", type: "Luxury", icon: "🖼️", cost: 50000, desc: "Rare art officially donated, privately enjoyed. +6 PR", pr: 6, ap: 0 },
+  { id: "mansion", item: "Georgetown Mansion Rent", type: "Property", icon: "🏛️", cost: 15000, desc: "For senator dinners. +$5,000/tick passive. +3 PR, +2 AP", pr: 3, ap: 2 },
+  { id: "gala", item: "Lobbyist Extravaganza", type: "Influence", icon: "🥂", cost: 45000, desc: "A secret Capitol gala. +10 AP, +1 AP/tick regen", pr: 0, ap: 10 },
+  { id: "office", item: "Custom Pentagon Office", type: "Influence", icon: "🚪", cost: 80000, desc: "Gold-plated, imposing. +8 PR", pr: 8, ap: 0 },
+  { id: "security", item: "Private Security Detail", type: "Hardware", icon: "🛡️", cost: 120000, desc: "Ex-Delta operators. +5 PR, +5 AP, domestic threat immunity", pr: 5, ap: 5 },
+  { id: "swiss", item: "Swiss Bank Account", type: "Financial", icon: "💼", cost: 150000, desc: "Double salary streams. Salary now $50k/tick.", pr: 0, ap: 0 },
+  { id: "dinner", item: "JSOC Liaison Dinner Circuit", type: "Influence", icon: "🍽️", cost: 180000, desc: "Dinner with every combatant commander. +15 PR", pr: 15, ap: 0 },
+  { id: "paris_chateau", item: "Château de Luxe (Paris)", type: "Property", icon: "🏰", cost: 200000, desc: "Known diplomats envy your access. +12 AP per diplomatic meeting", pr: 10, ap: 8 },
+  { id: "patron", item: "Political Patron Network", type: "Influence", icon: "🤝", cost: 250000, desc: "Senators and Reps groomed over time. +15 AP, POTUS events +5 bonus AP", pr: 5, ap: 15 },
+  { id: "gwagon", item: "Armored G-Wagon Fleet", type: "Hardware", icon: "🚙", cost: 350000, desc: "Motorcade fit for an autocrat. +15 PR, +5 AP", pr: 15, ap: 5 },
+  { id: "cayman", item: "Private Cayman Island", type: "Property", icon: "🏝️", cost: 400000, desc: "Ultimate exit strategy. +25 PR, full financial immunity", pr: 25, ap: 0 },
+  { id: "armaments", item: "Offshore Armaments Cache", type: "Hardware", icon: "🔫", cost: 500000, desc: "Black-market weapons stockpile. Enables armed personal militia option.", pr: 20, ap: 0 },
+  { id: "superyacht", item: "Superyacht 'Diplomatic Immunity'", type: "Property", icon: "🛥️", cost: 800000, desc: "Floating extraterritorial palace. +30 PR", pr: 30, ap: 0 },
+  { id: "satellite", item: "Private Military Satellite", type: "Hardware", icon: "🛰️", cost: 1500000, desc: "Dedicated NRO-grade orbital surveillance. +40 PR, +10 AP", pr: 40, ap: 10 },
+];
+
 const UNITS = [
   { id: "delta", name: "Delta Force", abbr: "1SFOD-D", icon: "⚡", strength: 850, specialty: "Direct Action", theater: "Global" },
   { id: "seals", name: "SEAL Team 6", abbr: "DEVGRU", icon: "🔱", strength: 300, specialty: "Maritime Assault", theater: "Global" },
@@ -916,11 +934,14 @@ export default function GeneralHQ() {
   const [coupPhase, setCoupPhase] = useState(0);
   const [pressMsg, setPressMsg] = useState("");
   const [pressResult, setPressResult] = useState(null);
+  const [currentPressEvent, setCurrentPressEvent] = useState(null);
+  const [pressHistory, setPressHistory] = useState([]);
   const [presidentialMeet, setPresidentialMeet] = useState(null);
   const [nuclearWinter, setNuclearWinter] = useState(false);
   const [banks, setBanks] = useState({ personal: 45000, offshore: 0, slushFund: 5000000 }); // 3 independent accounts
   const [branchBudgets, setBranchBudgets] = useState({ army: 185, navy: 202, airforce: 216, marines: 53, spaceforce: 30 });
   const [heroRoster, setHeroRoster] = useState([]);
+  const [baseMorale, setBaseMorale] = useState(50);
   const [purchases, setPurchases] = useState([]);
   const [missions, setMissions] = useState([]);
   const [stateThreats, setStateThreats] = useState([]);
@@ -937,6 +958,11 @@ export default function GeneralHQ() {
   const [officerRoster, setOfficerRoster] = useState(INITIAL_OFFICERS);
   const [divisionPurchases, setDivisionPurchases] = useState([]);
   const [selectedCountry, setSelectedCountry] = useState(null); // For global military power map panel
+
+  const ap = general.approval || 70;
+  const pres = general.prestige || 60;
+  const def = general.defcon || 4;
+  const bankBalance = banks.personal || 0;
 
   const tick = useTick(1000);
 
@@ -958,7 +984,7 @@ export default function GeneralHQ() {
             const pmcPayout = (c.reward.pr * 15000) + 50000;
             setTimeout(() => {
               updateGeneral({ prestige: Math.min(100, (general.prestige || 60) + c.reward.pr), approval: Math.min(100, (general.approval || 70) + c.reward.ap) });
-              setBankBalance(b => b + pmcPayout);
+              setBanks(b => ({ ...b, personal: b.personal + pmcPayout }));
               notify(`✓ ${c.name}: SUCCESS — +$${pmcPayout.toLocaleString()} wired offshore`, "#4caf50");
             }, 0);
           } else {
@@ -1124,7 +1150,11 @@ export default function GeneralHQ() {
       if (m.status === "ACTIVE") {
         const newP = m.progress + (5 + Math.floor(Math.random() * 10));
         if (newP >= 100) {
-          const success = Math.random() > (m.risk === "CRITICAL" ? 0.4 : m.risk === "HIGH" ? 0.25 : 0.1);
+          let riskCutoff = (m.risk === "CRITICAL" ? 0.4 : m.risk === "HIGH" ? 0.25 : 0.1);
+          if (baseMorale > 80) riskCutoff = Math.max(0.05, riskCutoff - 0.08); // High morale boost
+          if (baseMorale < 30) riskCutoff = Math.min(0.8, riskCutoff + 0.15);  // Low morale penalty
+          const success = Math.random() > riskCutoff;
+
           if (success) {
             setTimeout(() => {
               updateGeneral({ prestige: Math.min(100, (general.prestige || 60) + m.reward.prestige), approval: Math.min(100, (general.approval || 70) + m.reward.approval) });
@@ -1143,7 +1173,7 @@ export default function GeneralHQ() {
       }
       return m;
     }));
-  }, [tick, loaded, nuclearWinter]);
+  }, [tick, loaded, nuclearWinter, baseMorale]);
 
   /* Load/save */
   useEffect(() => {
@@ -1246,6 +1276,10 @@ export default function GeneralHQ() {
     if (outText.includes("die") || outText.includes("casualty") || outText.includes("wounded")) cas += Math.floor(Math.random() * 100) + 20;
     if (outText.includes("crash") || outText.includes("drop")) dmg += Number((Math.random() * 0.2).toFixed(2));
 
+    // Apply Base Morale effect to casualties
+    if (baseMorale > 80) cas = Math.floor(cas * 0.85); // 15% fewer casualties
+    if (baseMorale < 30) cas = Math.floor(cas * 1.25); // 25% more casualties
+
     const isDisaster = option.effect.approval < 0 || option.effect.prestige < 0;
 
     // 1. Apply Option Effects
@@ -1298,9 +1332,14 @@ export default function GeneralHQ() {
     else if (unit.id === "b52") branchBudget = branchBudgets.airforce;
     else if (unit.id === "1mar") branchBudget = branchBudgets.marines;
 
-    const chanceFail = branchBudget < 120 ? 0.6 : branchBudget < 180 ? 0.3 : 0;
+    let failMod = 0;
+    if (baseMorale > 80) failMod = -0.15;
+    if (baseMorale < 30) failMod = 0.2;
+    const baseChanceFail = branchBudget < 120 ? 0.6 : branchBudget < 180 ? 0.3 : 0;
+    const chanceFail = Math.max(0, baseChanceFail + failMod);
+
     if (Math.random() < chanceFail) {
-      notify(`${unit.name} DEPLOYMENT FAILED — SUPPLY SHORTAGE`, "#e84b4b");
+      notify(`${unit.name} DEPLOYMENT FAILED — SUPPLY SHORTAGE OR LOW MORALE`, "#e84b4b");
       updateGeneral({ prestige: Math.max(0, (general.prestige || 60) - 5), approval: Math.max(0, (general.approval || 70) - 2) });
       setShowDeploy(null);
       setSelectedZone(null);
@@ -1373,17 +1412,63 @@ export default function GeneralHQ() {
     setCoupPhase(0);
   }
 
-  function holdPressBriefing() {
-    if (!pressMsg.trim()) { return; }
-    const words = pressMsg.toLowerCase();
-    let apDelta = 0, presDelta = 0, res = "";
-    if (words.includes("peace") || words.includes("diplomacy")) { apDelta += 5; res = "Media praises measured tone. Congressional approval up."; }
-    else if (words.includes("strength") || words.includes("deterrence")) { apDelta += 3; presDelta += 3; res = "Press corps approves. Allies reassured. POTUS notes the message."; }
-    else if (words.includes("war") || words.includes("strike")) { apDelta -= 8; presDelta -= 5; res = "Markets drop 2%. Allies call. POTUS is irritated by the rhetoric."; }
-    else { apDelta += 1; res = "Routine briefing. No major headlines."; }
-    updateGeneral({ approval: Math.max(0, Math.min(100, (general.approval || 70) + apDelta)), prestige: Math.min(100, (general.prestige || 60) + presDelta) });
+  function initPressBriefing() {
+    if (activeLiveMission && !currentPressEvent) {
+      setCurrentPressEvent({
+        topic: `We're hearing reports about ${activeLiveMission.title}. What is the Pentagon's official stance?`,
+        context: "A live crisis is unfolding. Careful.",
+        options: [
+          { label: "Aggressive", text: "We will use overwhelming force.", apD: -5, presD: +8 },
+          { label: "Defensive", text: "We are protecting our interests.", apD: +4, presD: -2 },
+          { label: "Deflective", text: "I cannot comment on ongoing ops.", apD: -2, presD: -5 }
+        ]
+      });
+      return;
+    }
+
+    const topics = [
+      {
+        topic: "General, there are rumors of a black budget slush fund. Your comment?",
+        context: "Follow-up investigative report by the NYT.",
+        options: [
+          { label: "Aggressive", text: "That is a baseless conspiracy theory.", apD: -2, presD: +5 },
+          { label: "Defensive", text: "All funds are audited by Congress.", apD: +5, presD: -2 },
+          { label: "Deflective", text: "I do not discuss classified budgets.", apD: 0, presD: 0 }
+        ]
+      },
+      {
+        topic: "How do you respond to allies saying America is stepping back from the world stage?",
+        context: "Recent NATO summit friction.",
+        options: [
+          { label: "Aggressive", text: "We lead. They need to pay their fair share.", apD: +8, presD: -5 },
+          { label: "Defensive", text: "Our commitment to allies remains ironclad.", apD: +2, presD: +4 },
+          { label: "Deflective", text: "We re-evaluate posture continually.", apD: -2, presD: -2 }
+        ]
+      },
+      {
+        topic: "General, is a military conflict with China inevitable in this decade?",
+        context: "Rising tensions in the South China Sea.",
+        options: [
+          { label: "Aggressive", text: "If they want a fight, we are ready tonight.", apD: -8, presD: +12 },
+          { label: "Defensive", text: "We seek competition, not conflict.", apD: +6, presD: -3 },
+          { label: "Deflective", text: "Our job is deterrence, not prediction.", apD: +4, presD: +2 }
+        ]
+      }
+    ];
+    setCurrentPressEvent(topics[Math.floor(Math.random() * topics.length)]);
+    setPressResult(null);
+  }
+
+  function handlePressQA(option) {
+    updateGeneral({
+      approval: Math.max(0, Math.min(100, (general.approval || 70) + option.apD)),
+      prestige: Math.max(0, Math.min(100, (general.prestige || 60) + option.presD))
+    });
+
+    let res = `You answered: "${option.text}" \nResult: Approval ${option.apD > 0 ? "+" : ""}${option.apD}, Prestige ${option.presD > 0 ? "+" : ""}${option.presD}`;
     setPressResult(res);
-    setPressMsg("");
+    setPressHistory(h => [{ q: currentPressEvent.topic, a: option.text, res }, ...h].slice(0, 5));
+    setCurrentPressEvent(null);
     notify("Press briefing completed");
   }
 
@@ -1433,10 +1518,6 @@ export default function GeneralHQ() {
       </div>
     </>
   );
-
-  const ap = general.approval || 70;
-  const def = general.defcon || 4;
-  const pres = general.prestige || 60;
 
   return (
     <>
@@ -2167,72 +2248,46 @@ export default function GeneralHQ() {
                     </div>
                   ))}
                 </div>
-              </div>
-            )}
 
-            {/* ══ GENERAL'S QUARTERS ══ */}
-            {tab === "quarters" && (
-              <div style={{ animation: "fadeUp 0.3s" }}>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-                  <div>
-                    <div style={{ fontSize: 9, color: "#e8b84b", letterSpacing: 4, marginBottom: 12 }}>◈ PERSONAL FINANCES & LIFESTYLE</div>
-                    <div className="panel-gold" style={{ padding: 24, textAlign: "center", marginBottom: 14 }}>
-                      <div style={{ fontSize: 10, color: "#7a6a3a", letterSpacing: 2 }}>OFFSHORE / PERSONAL ACCOUNT</div>
-                      <div style={{ fontSize: 42, color: "#ffd700", fontFamily: "Oswald,sans-serif", letterSpacing: 2, textShadow: "0 0 20px #ffd70066" }}>
-                        ${bankBalance.toLocaleString()}
-                      </div>
-                      <div style={{ fontSize: 8, color: "#5a5a3a", marginTop: 4 }}>Base Salary: $15,000/mo · Hazard Pay Included</div>
-                    </div>
-
-                    <div style={{ fontSize: 9, color: "#7a6a3a", letterSpacing: 2, marginBottom: 8 }}>PRESTIGE EXPENDITURES:</div>
+                {/* Base Visitations */}
+                <div style={{ marginTop: 20 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 12 }}>
+                    <div style={{ fontSize: 9, color: "#4caf50", letterSpacing: 4 }}>◈ TROOP MORALE & BASE VISITATIONS</div>
+                    <div style={{ fontSize: 10, color: baseMorale > 70 ? "#4caf50" : baseMorale < 30 ? "#e84b4b" : "#e8b84b", fontFamily: "Oswald,sans-serif", letterSpacing: 1 }}>OVERALL MORALE: {baseMorale}%</div>
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 14 }}>
                     {[
-                      { item: "Vintage Cuban Cigars", cost: 2000, desc: "For the Situation Room. (+1 PR)" },
-                      { item: "Georgetown Mansion Rent", cost: 15000, desc: "Impress senators at dinner. (+3 PR, +2 AP)" },
-                      { item: "Lobbyist Extravaganza", cost: 45000, desc: "Throw a massive secret gala. (+10 AP)" },
-                      { item: "Private Cayman Island", cost: 250000, desc: "Ultimate exit strategy. (+25 PR)" },
-                    ].map(p => {
-                      const owned = purchases.includes(p.item);
-                      return (
-                        <div key={p.item} className="choice-card" style={{ marginBottom: 6, borderColor: owned ? "#ffd700" : "#2a2a00" }} onClick={() => {
-                          if (owned) return;
-                          if (bankBalance >= p.cost) {
-                            setBankBalance(b => b - p.cost);
-                            setPurchases([...purchases, p.item]);
-                            notify(`Purchased: ${p.item}`, "#ffd700");
-                            if (p.cost === 2000) updateGeneral({ prestige: pres + 1 });
-                            if (p.cost === 15000) updateGeneral({ prestige: pres + 3, approval: Math.min(100, ap + 2) });
-                            if (p.cost === 45000) updateGeneral({ approval: Math.min(100, ap + 10) });
-                            if (p.cost === 250000) updateGeneral({ prestige: pres + 25 });
+                      { name: "Fort Bragg (Conventional)", cost: { ap: 2, time: 1 }, morale: 5, risk: 0, desc: "Standard troop visit. Safe PR win." },
+                      { name: "CENTCOM Forward Operating Base", cost: { ap: 5, time: 2 }, morale: 12, risk: 0.1, desc: "Visit active combat zone. High impact, slight risk." },
+                      { name: "Classified Black Site (Undisclosed)", cost: { ap: 10, time: 3 }, morale: 25, risk: 0.3, desc: "Visit Tier 1 operators. Massive morale boost, high exposure risk." }
+                    ].map((base, i) => (
+                      <div key={i} className="panel" style={{ padding: 14 }}>
+                        <div style={{ fontSize: 10, color: "#c8ffc8", marginBottom: 6, letterSpacing: 1 }}>{base.name}</div>
+                        <div style={{ fontSize: 8, color: "#5a7a5a", marginBottom: 12, minHeight: 24 }}>{base.desc}</div>
+                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 8, marginBottom: 12 }}>
+                          <span style={{ color: "#e8b84b" }}>COST: -{base.cost.ap} AP</span>
+                          <span style={{ color: "#4caf50" }}>MORALE: +{base.morale}</span>
+                        </div>
+                        <button className="btn" style={{ width: "100%", padding: "6px", fontSize: 8 }} onClick={() => {
+                          if (ap < base.cost.ap) {
+                            notify("INSUFFICIENT APPROVAL (AP) FOR THIS VISIT", "#e84b4b");
+                            return;
+                          }
+                          const isCompromised = Math.random() < base.risk;
+                          if (isCompromised) {
+                            notify(`VISIT COMPROMISED: Press caught wind of ${base.name} visit.`, "#e84b4b");
+                            updateGeneral({ approval: Math.max(0, ap - base.cost.ap - 5), prestige: Math.max(0, pres - 5) });
+                            setBaseMorale(m => Math.min(100, m + Math.floor(base.morale / 2)));
                           } else {
-                            notify("INSUFFICIENT FUNDS", "#e84b4b");
+                            notify(`VISIT SUCCESSFUL: Morale boosted by +${base.morale}% at ${base.name}.`, "#4caf50");
+                            updateGeneral({ approval: Math.max(0, ap - base.cost.ap), prestige: Math.min(100, pres + 2) });
+                            setBaseMorale(m => Math.min(100, m + base.morale));
                           }
                         }}>
-                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                            <div>
-                              <div style={{ fontSize: 11, color: owned ? "#ffd700" : "#c8b870", letterSpacing: 1 }}>{p.item}</div>
-                              <div style={{ fontSize: 8, color: "#5a5a3a", marginTop: 2 }}>{p.desc}</div>
-                            </div>
-                            <div style={{ fontSize: 10, color: owned ? "#4caf50" : bankBalance >= p.cost ? "#ffd700" : "#e84b4b", fontFamily: "Oswald,sans-serif" }}>
-                              {owned ? "OWNED" : `$${p.cost.toLocaleString()}`}
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                  <div>
-                    <div style={{ fontSize: 9, color: "#8aaa7a", letterSpacing: 4, marginBottom: 12 }}>◈ QUARTERS INVENTORY</div>
-                    <div className="panel" style={{ padding: 16, border: "1px solid #1a2a1a", minHeight: 200 }}>
-                      {purchases.length === 0 ? (
-                        <div style={{ fontSize: 9, color: "#3a5a3a", fontStyle: "italic", textAlign: "center", marginTop: 60 }}>You live a Spartan life. No luxuries acquired yet.</div>
-                      ) : (
-                        <ul style={{ paddingLeft: 16 }}>
-                          {purchases.map(p => (
-                            <li key={p} style={{ fontSize: 10, color: "#c8ffc8", marginBottom: 8, letterSpacing: 1 }}>{p}</li>
-                          ))}
-                        </ul>
-                      )}
-                    </div>
+                          INITIATE VISIT
+                        </button>
+                      </div>
+                    ))}
                   </div>
                 </div>
               </div>
@@ -2418,40 +2473,55 @@ export default function GeneralHQ() {
             {tab === "press" && (
               <div style={{ animation: "fadeUp 0.3s" }}>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+                  {/* Left Column: Interactive Q&A */}
                   <div>
                     <div style={{ fontSize: 9, color: "#3a5a3a", letterSpacing: 4, marginBottom: 12 }}>◈ PENTAGON PRESS BRIEFING ROOM</div>
-                    <div className="panel" style={{ padding: 20, marginBottom: 14 }}>
-                      <div style={{ fontSize: 9, color: "#4a6a4a", marginBottom: 12 }}>Compose your statement. Your words shape public perception and political standing. Media is watching — every word matters.</div>
-                      <div style={{ fontSize: 9, color: "#3a5a3a", marginBottom: 8 }}>TIP: Words like "peace", "strength", "deterrence" affect approval differently.</div>
-                      <textarea
-                        value={pressMsg}
-                        onChange={e => setPressMsg(e.target.value)}
-                        placeholder="TYPE YOUR STATEMENT TO THE PRESS..."
-                        style={{ width: "100%", height: 120, background: "#050d05", border: "1px solid #2a4a2a", color: "#c8ffc8", fontFamily: "monospace", fontSize: 11, padding: 12, resize: "none", outline: "none", letterSpacing: 1, lineHeight: 1.8 }}
-                      />
-                      <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
-                        <button className="btn" style={{ flex: 1 }} onClick={handlePressBriefing}>📡 DELIVER STATEMENT</button>
-                        <button className="btn" style={{ padding: "8px 14px" }} onClick={() => setPressMsg("")}>CLR</button>
+
+                    {!currentPressEvent ? (
+                      <div className="panel" style={{ padding: 20, marginBottom: 14, textAlign: "center" }}>
+                        <div style={{ fontSize: 11, color: "#c8ffc8", marginBottom: 12 }}>REPORTERS ARE GATHERING...</div>
+                        <div style={{ fontSize: 9, color: "#4a6a4a", marginBottom: 20 }}>Step up to the podium. Your words shape public perception and political standing.</div>
+                        <button className="btn btn-gold" style={{ padding: "12px 24px" }} onClick={initPressBriefing}>
+                          🎙️ STEP UP TO THE PODIUM
+                        </button>
                       </div>
-                    </div>
-                    {pressResult && (
-                      <div className="panel" style={{ padding: 16, border: "1px solid #2a4a2a", animation: "fadeUp 0.4s" }}>
-                        <div style={{ fontSize: 9, color: "#e8b84b", letterSpacing: 3, marginBottom: 8 }}>MEDIA RESPONSE</div>
-                        <div style={{ fontSize: 11, color: "#8aaa7a", lineHeight: 1.8 }}>{pressResult}</div>
+                    ) : (
+                      <div className="panel" style={{ padding: 20, border: "1px solid #ffd700", marginBottom: 14, animation: "fadeUp 0.3s" }}>
+                        <div style={{ fontSize: 9, color: "#e84b4b", letterSpacing: 2, marginBottom: 6 }}>🔴 LIVE PRESS QUESTION</div>
+                        <div style={{ fontSize: 14, color: "#ffffff", fontStyle: "italic", marginBottom: 12 }}>"{currentPressEvent.topic}"</div>
+                        <div style={{ fontSize: 9, color: "#7a6a3a", marginBottom: 20 }}>CONTEXT: {currentPressEvent.context}</div>
+
+                        <div style={{ fontSize: 9, color: "#3a5a3a", letterSpacing: 2, marginBottom: 8 }}>CHOOSE YOUR RESPONSE:</div>
+                        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                          {currentPressEvent.options.map((opt, i) => (
+                            <button key={i} className="choice-card" style={{ padding: 12, textAlign: "left" }} onClick={() => handlePressQA(opt)}>
+                              <div style={{ fontSize: 10, color: "#c8ffc8", marginBottom: 4 }}>[{opt.label}]</div>
+                              <div style={{ fontSize: 11, color: "#8aaa7a" }}>"{opt.text}"</div>
+                            </button>
+                          ))}
+                        </div>
                       </div>
                     )}
-                    {/* Canned statements */}
-                    <div style={{ fontSize: 9, color: "#3a5a3a", letterSpacing: 4, marginBottom: 10, marginTop: 14 }}>QUICK STATEMENTS:</div>
-                    {[
-                      "The United States Armed Forces remain at the highest state of readiness. Peace through strength is not a slogan — it is our doctrine.",
-                      "We will not tolerate any action that threatens the sovereignty of our allies. Our commitment to collective defense is ironclad.",
-                      "I want to be clear: the United States will pursue every diplomatic avenue before any kinetic action is considered.",
-                      "Our forces have deterrence capabilities that no adversary should test. The consequences would be swift and decisive.",
-                    ].map((s, i) => (
-                      <button key={i} className="btn" style={{ display: "block", width: "100%", textAlign: "left", marginBottom: 6, padding: "10px 14px", fontSize: 9, lineHeight: 1.6 }} onClick={() => setPressMsg(s)}>
-                        {s.slice(0, 60)}...
-                      </button>
-                    ))}
+
+                    {pressResult && (
+                      <div className="panel" style={{ padding: 16, border: "1px solid #2a4a2a", animation: "fadeUp 0.4s", marginBottom: 14 }}>
+                        <div style={{ fontSize: 9, color: "#e8b84b", letterSpacing: 3, marginBottom: 8 }}>LATEST BRIEFING RESULT</div>
+                        <div style={{ fontSize: 10, color: "#8aaa7a", lineHeight: 1.6 }}>{pressResult}</div>
+                      </div>
+                    )}
+
+                    {pressHistory.length > 0 && (
+                      <div className="panel" style={{ padding: 16 }}>
+                        <div style={{ fontSize: 9, color: "#3a5a3a", letterSpacing: 4, marginBottom: 10 }}>RECENT TRANSCRIPTS:</div>
+                        {pressHistory.map((h, i) => (
+                          <div key={i} style={{ marginBottom: 10, paddingBottom: 10, borderBottom: "1px solid #1a2a1a" }}>
+                            <div style={{ fontSize: 9, color: "#5a7a5a", fontStyle: "italic", marginBottom: 4 }}>Q: {h.q}</div>
+                            <div style={{ fontSize: 9, color: "#c8ffc8", marginBottom: 4 }}>A: "{h.a}"</div>
+                            <div style={{ fontSize: 8, color: "#7a6a3a" }}>{h.res.split('\n')[1]}</div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                   {/* Media landscape */}
                   <div>
@@ -2519,10 +2589,10 @@ export default function GeneralHQ() {
                           const branches = Object.keys(branchBudgets);
                           const siphonTarget = branches[Math.floor(Math.random() * branches.length)];
                           setBranchBudgets(b => ({ ...b, [siphonTarget]: Math.max(0, b[siphonTarget] - 5) }));
-                          setBlackBudget(b => b + 5);
+                          setBanks(b => ({ ...b, slushFund: b.slushFund + 5000000 }));
                           updateGeneral({ approval: Math.max(0, (general.approval || 60) - 2) });
-                          notify(`Siphoned $5B from ${siphonTarget.toUpperCase()} to Black Budget (-2 AP)`, "#ffd700");
-                        }}>SIPHON $5B TO BLACK BUDGET</button>
+                          notify(`Siphoned $5B from ${siphonTarget.toUpperCase()} to Slush Fund (-2 AP)`, "#ffd700");
+                        }}>SIPHON $5B TO SLUSH FUND</button>
                       </div>
                     </div>
                   </div>
@@ -2564,6 +2634,48 @@ export default function GeneralHQ() {
                       )}
                     </div>
                   ))}
+                </div>
+
+                {/* Base Visitations */}
+                <div style={{ marginTop: 20 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 12 }}>
+                    <div style={{ fontSize: 9, color: "#4caf50", letterSpacing: 4 }}>◈ TROOP MORALE & BASE VISITATIONS</div>
+                    <div style={{ fontSize: 10, color: baseMorale > 70 ? "#4caf50" : baseMorale < 30 ? "#e84b4b" : "#e8b84b", fontFamily: "Oswald,sans-serif", letterSpacing: 1 }}>OVERALL MORALE: {baseMorale}%</div>
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 14 }}>
+                    {[
+                      { name: "Fort Bragg (Conventional)", cost: { ap: 2, time: 1 }, morale: 5, risk: 0, desc: "Standard troop visit. Safe PR win." },
+                      { name: "CENTCOM Forward Operating Base", cost: { ap: 5, time: 2 }, morale: 12, risk: 0.1, desc: "Visit active combat zone. High impact, slight risk." },
+                      { name: "Classified Black Site (Undisclosed)", cost: { ap: 10, time: 3 }, morale: 25, risk: 0.3, desc: "Visit Tier 1 operators. Massive morale boost, high exposure risk." }
+                    ].map((base, i) => (
+                      <div key={i} className="panel" style={{ padding: 14 }}>
+                        <div style={{ fontSize: 10, color: "#c8ffc8", marginBottom: 6, letterSpacing: 1 }}>{base.name}</div>
+                        <div style={{ fontSize: 8, color: "#5a7a5a", marginBottom: 12, minHeight: 24 }}>{base.desc}</div>
+                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 8, marginBottom: 12 }}>
+                          <span style={{ color: "#e8b84b" }}>COST: -{base.cost.ap} AP</span>
+                          <span style={{ color: "#4caf50" }}>MORALE: +{base.morale}</span>
+                        </div>
+                        <button className="btn" style={{ width: "100%", padding: "6px", fontSize: 8 }} onClick={() => {
+                          if (ap < base.cost.ap) {
+                            notify("INSUFFICIENT APPROVAL (AP) FOR THIS VISIT", "#e84b4b");
+                            return;
+                          }
+                          const isCompromised = Math.random() < base.risk;
+                          if (isCompromised) {
+                            notify(`VISIT COMPROMISED: Press caught wind of ${base.name} visit.`, "#e84b4b");
+                            updateGeneral({ approval: Math.max(0, ap - base.cost.ap - 5), prestige: Math.max(0, pres - 5) });
+                            setBaseMorale(m => Math.min(100, m + Math.floor(base.morale / 2)));
+                          } else {
+                            notify(`VISIT SUCCESSFUL: Morale boosted by +${base.morale}% at ${base.name}.`, "#4caf50");
+                            updateGeneral({ approval: Math.max(0, ap - base.cost.ap), prestige: Math.min(100, pres + 2) });
+                            setBaseMorale(m => Math.min(100, m + base.morale));
+                          }
+                        }}>
+                          INITIATE VISIT
+                        </button>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
             )}
@@ -2912,13 +3024,73 @@ export default function GeneralHQ() {
               <div style={{ animation: "fadeUp 0.3s" }}>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
                   <div>
-                    <div style={{ fontSize: 9, color: "#e8b84b", letterSpacing: 4, marginBottom: 12 }}>◈ PERSONAL FINANCES & LIFESTYLE</div>
-                    <div className="panel-gold" style={{ padding: 24, textAlign: "center", marginBottom: 14 }}>
-                      <div style={{ fontSize: 10, color: "#7a6a3a", letterSpacing: 2 }}>PERSONAL ACCOUNT</div>
-                      <div style={{ fontSize: 42, color: "#ffd700", fontFamily: "Oswald,sans-serif", letterSpacing: 2, textShadow: "0 0 20px #ffd70066" }}>
-                        ${bankBalance.toLocaleString()}
+                    <div style={{ fontSize: 9, color: "#e8b84b", letterSpacing: 4, marginBottom: 12 }}>◈ THREE-TIER FINANCIAL INFRASTRUCTURE</div>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 8, marginBottom: 14 }}>
+                      <div className="panel-gold" style={{ padding: 16, textAlign: "left", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <div>
+                          <div style={{ fontSize: 10, color: "#7a6a3a", letterSpacing: 2 }}>PERSONAL ACCOUNT</div>
+                          <div style={{ fontSize: 8, color: "#5a5a3a", marginTop: 4 }}>Base Salary & Clean Funds. IRS Audited.</div>
+                        </div>
+                        <div style={{ fontSize: 28, color: "#ffd700", fontFamily: "Oswald,sans-serif", letterSpacing: 1, textShadow: "0 0 10px #ffd70066" }}>
+                          ${(banks.personal || 0).toLocaleString()}
+                        </div>
                       </div>
-                      <div style={{ fontSize: 8, color: "#5a5a3a", marginTop: 4 }}>Base Salary: $25,000/tick · PMC Contract Bonuses Apply</div>
+
+                      <div className="panel" style={{ padding: 16, textAlign: "left", display: "flex", justifyContent: "space-between", alignItems: "center", border: "1px solid #1a2a4a", background: "#050a15" }}>
+                        <div>
+                          <div style={{ fontSize: 10, color: "#4b9ae8", letterSpacing: 2 }}>OFFSHORE SHELL (CYPRUS)</div>
+                          <div style={{ fontSize: 8, color: "#5a7a9a", marginTop: 4 }}>PMC Earnings & Untraceable Corporate Wealth.</div>
+                        </div>
+                        <div style={{ fontSize: 28, color: "#4b9ae8", fontFamily: "Oswald,sans-serif", letterSpacing: 1, textShadow: "0 0 10px #4b9ae866" }}>
+                          ${(banks.offshore || 0).toLocaleString()}
+                        </div>
+                      </div>
+
+                      <div className="panel" style={{ padding: 16, textAlign: "left", display: "flex", justifyContent: "space-between", alignItems: "center", border: "1px solid #2a4a2a", background: "#050d05" }}>
+                        <div>
+                          <div style={{ fontSize: 10, color: "#4caf50", letterSpacing: 2 }}>DoD SLUSH FUND (BLACK BUDGET)</div>
+                          <div style={{ fontSize: 8, color: "#5a7a5a", marginTop: 4 }}>Siphoned Pentagon Operations Capital. Highly Illegal.</div>
+                        </div>
+                        <div style={{ fontSize: 28, color: "#4caf50", fontFamily: "Oswald,sans-serif", letterSpacing: 1, textShadow: "0 0 10px #4caf5066" }}>
+                          ${(banks.slushFund || 0).toLocaleString()}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="panel" style={{ padding: 12, marginBottom: 14, border: "1px solid #1a1a2a", background: "#020502" }}>
+                      <div style={{ fontSize: 8, color: "#8aaa7a", letterSpacing: 2, marginBottom: 8 }}>MONEY LAUNDERING & TRANSFERS</div>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                        <button className="btn" style={{ fontSize: 8, padding: "8px" }} onClick={() => {
+                          if (banks.offshore >= 100000) {
+                            if (Math.random() < 0.15 && !purchases.includes("Private Cayman Island")) {
+                              setBanks(b => ({ ...b, offshore: b.offshore - 100000, personal: Math.max(0, b.personal - 50000) }));
+                              updateGeneral({ approval: Math.max(0, ap - 5), prestige: Math.max(0, pres - 2) });
+                              notify("IRS AUDIT TRIGGERED! Funds frozen. Fined $50K Personal. -5 AP", "#e84b4b");
+                            } else {
+                              setBanks(b => ({ ...b, offshore: b.offshore - 100000, personal: b.personal + 80000 }));
+                              notify("Laundered $100k Offshore → $80k Personal (20% fee)", "#4caf50");
+                            }
+                          } else {
+                            notify("INSUFFICIENT OFFSHORE FUNDS ($100k req)", "#e84b4b");
+                          }
+                        }}>Offshore → Personal ($100k) (15% Risk)</button>
+
+                        <button className="btn btn-red" style={{ fontSize: 8, padding: "8px" }} onClick={() => {
+                          if (banks.slushFund >= 1000000) {
+                            if (Math.random() < 0.35 && !purchases.includes("Private Cayman Island")) {
+                              setBanks(b => ({ ...b, slushFund: b.slushFund - 1000000 }));
+                              updateGeneral({ approval: Math.max(0, ap - 15), prestige: Math.max(0, pres - 15) });
+                              notify("CONGRESSIONAL SUBPOENA! Embezzlement discovered. -15 AP, -15 PR", "#e84b4b");
+                            } else {
+                              setBanks(b => ({ ...b, slushFund: b.slushFund - 1000000, offshore: b.offshore + 500000 }));
+                              notify("Siphoned $1M Slush → $500k Offshore. Undetected.", "#e8b84b");
+                              updateGeneral({ approval: Math.max(0, ap - 2) });
+                            }
+                          } else {
+                            notify("INSUFFICIENT SLUSH FUNDS ($1M req)", "#e84b4b");
+                          }
+                        }}>Slush Fund → Offshore ($1M) (35% Risk)</button>
+                      </div>
                     </div>
 
                     {purchases.length > 0 && (
@@ -2938,32 +3110,19 @@ export default function GeneralHQ() {
                       </div>
                     )}
 
-                    <div style={{ fontSize: 9, color: "#7a6a3a", letterSpacing: 2, marginBottom: 8 }}>PRESTIGE EXPENDITURES:</div>
-                    {[
-                      { item: "Vintage Cuban Cigars", cost: 2000, desc: "Impress the Joint Chiefs. +1 PR", pr: 1, ap: 0 },
-                      { item: "Georgetown Mansion Rent", cost: 15000, desc: "For senator dinners. +$5,000/tick passive. +3 PR, +2 AP", pr: 3, ap: 2 },
-                      { item: "Lobbyist Extravaganza", cost: 45000, desc: "A secret Capitol gala. +10 AP, +1 AP/tick regen", pr: 0, ap: 10 },
-                      { item: "Custom Pentagon Office", cost: 80000, desc: "Gold-plated, imposing. +8 PR", pr: 8, ap: 0 },
-                      { item: "Private Security Detail", cost: 120000, desc: "Ex-Delta operators. +5 PR, +5 AP, domestic threat immunity", pr: 5, ap: 5 },
-                      { item: "Swiss Bank Account", cost: 150000, desc: "Double salary streams. Salary now $50k/tick.", pr: 0, ap: 0 },
-                      { item: "JSOC Liaison Dinner Circuit", cost: 180000, desc: "Dinner with every combatant commander. +15 PR", pr: 15, ap: 0 },
-                      { item: "Château de Luxe (Paris)", cost: 200000, desc: "Known diplomats envy your access. +12 AP per diplomatic meeting", pr: 10, ap: 8 },
-                      { item: "Political Patron Network", cost: 250000, desc: "Senators and Reps groomed over time. +15 AP, POTUS events +5 bonus AP", pr: 5, ap: 15 },
-                      { item: "Private Cayman Island", cost: 400000, desc: "Ultimate exit strategy. +25 PR, full financial immunity", pr: 25, ap: 0 },
-                      { item: "Offshore Armaments Cache", cost: 500000, desc: "Black-market weapons stockpile. Enables armed personal militia option.", pr: 20, ap: 0 },
-                      { item: "Pentagon Art Collection", cost: 50000, desc: "Rare art officially donated, privately enjoyed. +6 PR", pr: 6, ap: 0 },
-                    ].map(p => {
+                    <div style={{ fontSize: 9, color: "#7a6a3a", letterSpacing: 2, marginBottom: 8 }}>PRESTIGE EXPENDITURES (PERSONAL FUNDS):</div>
+                    {PRESTIGE_ASSETS.map(p => {
                       const owned = purchases.includes(p.item);
                       return (
                         <div key={p.item} className="choice-card" style={{ marginBottom: 6, borderColor: owned ? "#ffd700" : "#2a2a00" }} onClick={() => {
                           if (owned) return;
-                          if (bankBalance >= p.cost) {
-                            setBankBalance(b => b - p.cost);
+                          if (banks.personal >= p.cost) {
+                            setBanks(b => ({ ...b, personal: b.personal - p.cost }));
                             setPurchases(prev => [...prev, p.item]);
                             notify(`Acquired: ${p.item}`, "#ffd700");
                             updateGeneral({ prestige: Math.min(100, pres + p.pr), approval: Math.min(100, ap + p.ap) });
                           } else {
-                            notify("INSUFFICIENT FUNDS", "#e84b4b");
+                            notify("INSUFFICIENT PERSONAL FUNDS", "#e84b4b");
                           }
                         }}>
                           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -2971,8 +3130,8 @@ export default function GeneralHQ() {
                               <div style={{ fontSize: 11, color: owned ? "#ffd700" : "#c8b870", letterSpacing: 1 }}>{p.item}</div>
                               <div style={{ fontSize: 8, color: "#5a5a3a", marginTop: 2 }}>{p.desc}</div>
                             </div>
-                            <div style={{ fontSize: 10, color: owned ? "#4caf50" : bankBalance >= p.cost ? "#ffd700" : "#e84b4b", fontFamily: "Oswald,sans-serif", flexShrink: 0, marginLeft: 8 }}>
-                              {owned ? "OWNED" : `$${p.cost.toLocaleString()}`}
+                            <div style={{ fontSize: 10, color: owned ? "#4caf50" : banks.personal >= p.cost ? "#ffd700" : "#e84b4b", fontFamily: "Oswald,sans-serif", flexShrink: 0, marginLeft: 8 }}>
+                              {owned ? "OWNED" : `$${p.cost.toLocaleString()} (Personal)`}
                             </div>
                           </div>
                         </div>
@@ -2992,12 +3151,16 @@ export default function GeneralHQ() {
                           </div>
                           <div style={{ fontSize: 10, color: "#ffd700", marginBottom: 12, fontFamily: "Oswald,sans-serif" }}>ESTABLISHMENT COST: $50,000</div>
                           <button className="btn" style={{ borderColor: "#4b9ae8", color: "#4b9ae8", width: "100%" }} onClick={() => {
-                            if (bankBalance >= 50000) {
-                              setBankBalance(b => b - 50000);
+                            if (banks.offshore >= 50000 || banks.personal >= 50000) {
+                              if (banks.offshore >= 50000) {
+                                setBanks(b => ({ ...b, offshore: b.offshore - 50000 }));
+                              } else {
+                                setBanks(b => ({ ...b, personal: b.personal - 50000 }));
+                              }
                               updateGeneral({ ownsPMC: true, pmcStats: { name: "Aegis Solutions LLC", rep: 10, funds: 0, tier: 1, contractors: 50, drones: 0 } });
                               notify("SHADOW PMC ESTABLISHED: AEGIS SOLUTIONS LLC — DoD Clearance Level V acquired.", "#4b9ae8");
                             } else {
-                              notify("INSUFFICIENT PERSONAL FUNDS", "#e84b4b");
+                              notify("INSUFFICIENT OFFSHORE OR PERSONAL FUNDS", "#e84b4b");
                             }
                           }}>AUTHORIZE WIRE TRANSFER → NICOSIA, CYPRUS</button>
                         </div>
@@ -3009,7 +3172,7 @@ export default function GeneralHQ() {
                               <div style={{ fontSize: 8, color: "#5a7a9a", marginTop: 2 }}>OFFSHORE HOLDING · DoD CLEARANCE L-V · TIER {general.pmcStats?.tier || 1}</div>
                             </div>
                             <div style={{ textAlign: "right" }}>
-                              <div style={{ fontSize: 20, color: "#ffd700", fontFamily: "Oswald,sans-serif" }}>${bankBalance.toLocaleString()}</div>
+                              <div style={{ fontSize: 20, color: "#4b9ae8", fontFamily: "Oswald,sans-serif" }}>${(banks.offshore || 0).toLocaleString()}</div>
                               <div style={{ fontSize: 7, color: "#5a5a3a" }}>PERSONAL ACCOUNTS</div>
                             </div>
                           </div>
@@ -3047,8 +3210,8 @@ export default function GeneralHQ() {
                                 ) : (
                                   <button className="btn" style={{ fontSize: 8, padding: "4px 10px", borderColor: bankBalance >= upg.cost ? "#4b9ae8" : "#e84b4b", color: bankBalance >= upg.cost ? "#4b9ae8" : "#e84b4b" }}
                                     onClick={() => {
-                                      if (bankBalance < upg.cost) { notify("INSUFFICIENT FUNDS", "#e84b4b"); return; }
-                                      setBankBalance(b => b - upg.cost);
+                                      if (banks.personal < upg.cost) { notify("INSUFFICIENT FUNDS", "#e84b4b"); return; }
+                                      setBanks(b => ({ ...b, personal: b.personal - upg.cost }));
                                       updateGeneral({ pmcUpgrades: [...(general.pmcUpgrades || []), upg.id], pmcStats: { ...general.pmcStats, rep: Math.min(100, (general.pmcStats?.rep || 10) + 10), contractors: (general.pmcStats?.contractors || 50) + (upg.id === "u1" ? 50 : 0), drones: (general.pmcStats?.drones || 0) + (upg.id === "u2" ? 10 : 0) } });
                                       notify(`PMC UPGRADE: ${upg.label}`, "#4b9ae8");
                                     }}>
@@ -3082,7 +3245,7 @@ export default function GeneralHQ() {
                                     onClick={() => {
                                       const success = Math.random() > contract.risk;
                                       if (success) {
-                                        setBankBalance(b => b + contract.value);
+                                        setBanks(b => ({ ...b, personal: b.personal + contract.value }));
                                         updateGeneral({ dodContracts: [...(general.dodContracts || []), contract.id], pmcStats: { ...general.pmcStats, rep: Math.min(100, (general.pmcStats?.rep || 10) + 5) } });
                                         notify(`DoD Contract Won: +$${contract.value.toLocaleString()} deposited`, "#ffd700");
                                       } else {
@@ -3102,11 +3265,20 @@ export default function GeneralHQ() {
                       {purchases.length === 0 ? (
                         <div style={{ fontSize: 9, color: "#3a5a3a", fontStyle: "italic", textAlign: "center", marginTop: 16 }}>You live a Spartan life. No luxuries acquired.</div>
                       ) : (
-                        <ul style={{ paddingLeft: 14, margin: 0 }}>
-                          {purchases.map(p => (
-                            <li key={p} style={{ fontSize: 10, color: "#c8b870", marginBottom: 6, letterSpacing: 1 }}>🏆 {p}</li>
-                          ))}
-                        </ul>
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                          {purchases.map(pName => {
+                            const pAsset = PRESTIGE_ASSETS.find(a => a.item === pName) || { icon: "🏆", type: "Unknown" };
+                            return (
+                              <div key={pName} style={{ display: "flex", gap: 10, alignItems: "center", background: "#050a05", border: "1px solid #1a2a1a", padding: "8px 10px" }}>
+                                <div style={{ fontSize: 18, background: "#000", border: "1px solid #c8b87044", padding: "4px", borderRadius: 4 }}>{pAsset.icon}</div>
+                                <div>
+                                  <div style={{ fontSize: 9, color: "#c8b870", letterSpacing: 1 }}>{pName}</div>
+                                  <div style={{ fontSize: 7, color: "#5a7a5a", marginTop: 2, textTransform: "uppercase" }}>{pAsset.type} ASSET</div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
                       )}
                     </div>
                   </div>
@@ -3119,7 +3291,7 @@ export default function GeneralHQ() {
               <div style={{ animation: "fadeUp 0.3s" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
                   <div style={{ fontSize: 9, color: "#4caf50", letterSpacing: 4 }}>◈ DENIABLE ASSETS & PRIVATE CONTRACTORS</div>
-                  <div style={{ fontSize: 12, color: "#4caf50", fontFamily: "Oswald,sans-serif", padding: "4px 12px", border: "1px solid #4caf50" }}>BLACK BUDGET: ${blackBudget}B</div>
+                  <div style={{ fontSize: 12, color: "#4caf50", fontFamily: "Oswald,sans-serif", padding: "4px 12px", border: "1px solid #4caf50" }}>BLACK BUDGET: ${banks.slushFund}B</div>
                 </div>
                 {tick < 100 && <div style={{ fontSize: 10, color: "#5a7a5a", fontStyle: "italic", padding: 20 }}>Encrypted channels establishing... Please wait.</div>}
 
@@ -3168,15 +3340,15 @@ export default function GeneralHQ() {
                         <div style={{ fontSize: 8, color: "#5a5a3a", marginBottom: 4 }}>{op.desc}</div>
                         <div style={{ fontSize: 7, color: "#4a5a4a", marginBottom: 8 }}>Via: {op.contractor} · Risk: <span style={{ color: op.risk > 0.3 ? "#e84b4b" : "#e8b84b" }}>{Math.round(op.risk * 100)}% intercept probability</span></div>
                         <button className="btn btn-gold" style={{ fontSize: 8, width: "100%", padding: 6 }}
-                          disabled={blackBudget < op.cost || activeContracts.length >= 5}
+                          disabled={banks.slushFund < op.cost || activeContracts.length >= 5}
                           onClick={() => {
-                            setBlackBudget(b => b - op.cost);
+                            setBanks(b => ({ ...b, slushFund: b.slushFund - op.cost }));
                             setActiveContracts(prev => [...prev, { id: Date.now(), name: op.name, contractor: op.contractor, progress: 0, status: "ACTIVE", risk: op.risk, reward: op.reward, penalty: op.penalty }]);
                             notify(`Contract Authorized: ${op.contractor}`, "#ffd700");
                             updateGeneral({ prestige: Math.min(100, (general.prestige || 60) + 2) });
                           }}
                         >
-                          {blackBudget < op.cost ? "INSUFFICIENT BLACK FUNDS" : `AUTHORIZE DIRECT TRANSFER $${op.cost}B`}
+                          {banks.slushFund < op.cost ? "INSUFFICIENT BLACK FUNDS" : `AUTHORIZE DIRECT TRANSFER $${op.cost}B`}
                         </button>
                       </div>
                     ))}
@@ -3278,8 +3450,8 @@ export default function GeneralHQ() {
                         { label: "COUNTERINTEL SWEEP — DOMESTIC", desc: "FBI/CIA joint sweep of foreign agent networks", cost: 6, effect: { ap: 6, pr: 5 } },
                       ].map((action, i) => (
                         <div key={i} className="choice-card" style={{ marginBottom: 8, borderColor: "#1a2a4a" }} onClick={() => {
-                          if (blackBudget < action.cost) return notify("INSUFFICIENT BLACK BUDGET", "#e84b4b");
-                          setBlackBudget(b => b - action.cost);
+                          if (banks.slushFund < action.cost) return notify("INSUFFICIENT BLACK BUDGET", "#e84b4b");
+                          setBanks(b => ({ ...b, slushFund: b.slushFund - action.cost }));
                           updateGeneral({ approval: Math.max(0, Math.min(100, ap + action.effect.ap)), prestige: Math.max(0, Math.min(100, pres + action.effect.pr)) });
                           notify(`AUTHORIZED: ${action.label}`, "#4b9ae8");
                         }}>
@@ -3523,7 +3695,7 @@ export default function GeneralHQ() {
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 10, marginBottom: 16 }}>
                     {[
                       { label: "OFFENSIVE OPS", val: cyberOpsLaunched.length, color: "#e84b4b" },
-                      { label: "BLACK BUDGET", val: `$${blackBudget}B`, color: "#ffd700" },
+                      { label: "BLACK BUDGET", val: `$${banks.slushFund}B`, color: "#ffd700" },
                       { label: "CYBER POSTURE", val: cyberPosture, color: cyberPosture === "DEFEND" ? "#4caf50" : cyberPosture === "MONITOR" ? "#e8b84b" : "#e84b4b" },
                       { label: "DEFCON LEVEL", val: def, color: def <= 2 ? "#e84b4b" : "#4caf50" },
                     ].map(s => (
@@ -3563,10 +3735,10 @@ export default function GeneralHQ() {
                               </div>
                               {!launched ? (
                                 <button className="btn btn-red" style={{ fontSize: 8, padding: "4px 10px" }}
-                                  disabled={blackBudget < op.cost}
+                                  disabled={banks.slushFund < op.cost}
                                   onClick={() => {
-                                    if (blackBudget < op.cost) return notify("INSUFFICIENT BLACK BUDGET", "#e84b4b");
-                                    setBlackBudget(b => b - op.cost);
+                                    if (banks.slushFund < op.cost) return notify("INSUFFICIENT BLACK BUDGET", "#e84b4b");
+                                    setBanks(b => ({ ...b, slushFund: b.slushFund - op.cost }));
                                     const success = Math.random() > op.risk;
                                     if (success) {
                                       updateGeneral({
@@ -3586,7 +3758,7 @@ export default function GeneralHQ() {
                                       notify(`✗ ${op.label} — OPERATION BLOWN. Attribution leaked. Blowback imminent.`, "#e84b4b");
                                     }
                                   }}>
-                                  {blackBudget < op.cost ? "INSUFFICIENT FUNDS" : "⚡ AUTHORIZE STRIKE"}
+                                  {banks.slushFund < op.cost ? "INSUFFICIENT FUNDS" : "⚡ AUTHORIZE STRIKE"}
                                 </button>
                               ) : (
                                 <div style={{ fontSize: 8, color: "#4caf50", letterSpacing: 2 }}>✓ OP COMPLETE</div>
@@ -3706,7 +3878,7 @@ export default function GeneralHQ() {
                                 onClick={() => {
                                   const cost = Math.round(stock.price * 10);
                                   if (bankBalance < cost) return notify("INSUFFICIENT FUNDS", "#e84b4b");
-                                  setBankBalance(b => b - cost);
+                                  setBanks(b => ({ ...b, personal: b.personal - cost }));
                                   updateGeneral({ stockPortfolio: { ...portfolio, [stock.id]: sharesOwned + 10 } });
                                   notify(`BOUGHT 10 shares ${stock.ticker} @ $${Math.round(stock.price)} = -$${cost.toLocaleString()}`, "#ffd700");
                                 }}>
@@ -3716,7 +3888,7 @@ export default function GeneralHQ() {
                                 <button className="btn btn-red" style={{ flex: 1, fontSize: 8, padding: "5px 0" }}
                                   onClick={() => {
                                     const proceeds = Math.round(stock.price * sharesOwned);
-                                    setBankBalance(b => b + proceeds);
+                                    setBanks(b => ({ ...b, personal: b.personal + proceeds }));
                                     updateGeneral({ stockPortfolio: { ...portfolio, [stock.id]: 0 } });
                                     notify(`SOLD ${sharesOwned} shares ${stock.ticker} @ $${Math.round(stock.price)} = +$${proceeds.toLocaleString()}`, "#4caf50");
                                   }}>
@@ -3801,8 +3973,8 @@ export default function GeneralHQ() {
               <div style={{ fontSize: 8, color: "#ffd70066", letterSpacing: 2 }}>★★★★ GENERAL {general.name.toUpperCase()}</div>
             </div>
           </div>
-        </div>
-      </div>
+        </div >
+      </div >
     </>
   );
 }

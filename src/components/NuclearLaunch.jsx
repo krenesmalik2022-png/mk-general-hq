@@ -16,10 +16,16 @@ export function NuclearLaunch({ defcon, onClose, onLaunch }) {
 
     useEffect(() => {
         if (countdown === null) return;
-        if (countdown === 0) { setLaunched(true); onLaunch(); return; }
+        if (countdown === 0) {
+            setTimeout(() => {
+                setLaunched(true);
+                onLaunch();
+            }, 0);
+            return;
+        }
         const t = setTimeout(() => setCountdown(c => c - 1), 1000);
         return () => clearTimeout(t);
-    }, [countdown]);
+    }, [countdown, onLaunch]);
 
     const steps = ["AUTHORIZATION", "AUTHENTICATION", "TARGET SELECTION", "CONFIRMATION", "LAUNCH"];
 

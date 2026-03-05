@@ -3,13 +3,27 @@ import { useState, useEffect, useRef } from "react";
 export function Typewriter({ text, speed = 12, onDone }) {
     const [o, setO] = useState(""), i = useRef(0);
     useEffect(() => {
+        let isCancelled = false;
         i.current = 0;
-        setO("");
+
+        // Reset o asynchronously
+        setTimeout(() => {
+            if (!isCancelled) setO("");
+        }, 0);
+
         const v = setInterval(() => {
-            if (i.current < text.length) setO(text.slice(0, ++i.current));
-            else { clearInterval(v); onDone?.(); }
+            if (i.current < text.length) {
+                if (!isCancelled) setO(text.slice(0, ++i.current));
+            } else {
+                clearInterval(v);
+                if (!isCancelled) onDone?.();
+            }
         }, speed);
-        return () => clearInterval(v);
+
+        return () => {
+            isCancelled = true;
+            clearInterval(v);
+        };
     }, [text, speed, onDone]);
 
     return (
