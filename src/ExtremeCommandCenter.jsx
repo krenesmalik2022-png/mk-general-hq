@@ -952,14 +952,14 @@ export default function GeneralHQ() {
 
   // Politician Relationship Network
   const [politicians, setPoliticians] = useState([
-    { id: "sec_def",   name: "Sec. Mark Ellis",     role: "Secretary of Defense",     relation: 72, emoji: "🏛", favor: "ALLY",    riskyAbility: "Authorize black budget", stance: "PRO-MILITARY" },
-    { id: "sec_state", name: "Sec. Rachel Okafor",  role: "Secretary of State",       relation: 55, emoji: "📜", favor: "NEUTRAL", riskyAbility: "Cover up an operation", stance: "DIPLOMATIC" },
-    { id: "sen_hawk",  name: "Sen. John Hargrove",  role: "Senate Armed Svcs (SASC)", relation: 60, emoji: "⚔️", favor: "ALLY",    riskyAbility: "Push military budget up", stance: "HAWK" },
-    { id: "sen_dove",  name: "Sen. Lisa Hartwell",  role: "Senate Finance Chair",     relation: 30, emoji: "📉", favor: "HOSTILE", riskyAbility: "Trigger DoD audit", stance: "DOVE" },
-    { id: "gov_tex",   name: "Gov. Brent Cole",     role: "Governor of Texas (NG)",   relation: 80, emoji: "🤠", favor: "ALLY",    riskyAbility: "Deploy National Guard", stance: "PRO-MILITARY" },
-    { id: "cia_dir",   name: "Dir. Claudia Vega",   role: "CIA Director",             relation: 65, emoji: "👁", favor: "ALLY",    riskyAbility: "Classify an operation", stance: "INTEL" },
-    { id: "fbi_dir",   name: "Dir. Frank Hoover",   role: "FBI Director",             relation: 42, emoji: "🕵️", favor: "NEUTRAL", riskyAbility: "Open an investigation", stance: "LAW" },
-    { id: "vp",        name: "VP Samuel Morris",    role: "Vice President",           relation: 68, emoji: "🤝", favor: "ALLY",    riskyAbility: "Backdoor POTUS orders", stance: "MODERATE" },
+    { id: "sec_def", name: "Sec. Mark Ellis", role: "Secretary of Defense", relation: 72, emoji: "🏛", favor: "ALLY", riskyAbility: "Authorize black budget", stance: "PRO-MILITARY" },
+    { id: "sec_state", name: "Sec. Rachel Okafor", role: "Secretary of State", relation: 55, emoji: "📜", favor: "NEUTRAL", riskyAbility: "Cover up an operation", stance: "DIPLOMATIC" },
+    { id: "sen_hawk", name: "Sen. John Hargrove", role: "Senate Armed Svcs (SASC)", relation: 60, emoji: "⚔️", favor: "ALLY", riskyAbility: "Push military budget up", stance: "HAWK" },
+    { id: "sen_dove", name: "Sen. Lisa Hartwell", role: "Senate Finance Chair", relation: 30, emoji: "📉", favor: "HOSTILE", riskyAbility: "Trigger DoD audit", stance: "DOVE" },
+    { id: "gov_tex", name: "Gov. Brent Cole", role: "Governor of Texas (NG)", relation: 80, emoji: "🤠", favor: "ALLY", riskyAbility: "Deploy National Guard", stance: "PRO-MILITARY" },
+    { id: "cia_dir", name: "Dir. Claudia Vega", role: "CIA Director", relation: 65, emoji: "👁", favor: "ALLY", riskyAbility: "Classify an operation", stance: "INTEL" },
+    { id: "fbi_dir", name: "Dir. Frank Hoover", role: "FBI Director", relation: 42, emoji: "🕵️", favor: "NEUTRAL", riskyAbility: "Open an investigation", stance: "LAW" },
+    { id: "vp", name: "VP Samuel Morris", role: "Vice President", relation: 68, emoji: "🤝", favor: "ALLY", riskyAbility: "Backdoor POTUS orders", stance: "MODERATE" },
   ]);
 
   const [banks, setBanks] = useState({ personal: 45000, offshore: 0, slushFund: 5000000 }); // 3 independent accounts
@@ -970,7 +970,7 @@ export default function GeneralHQ() {
   const [missions, setMissions] = useState([]);
   const [stateThreats, setStateThreats] = useState([]);
   const [showPotus, setShowPotus] = useState(false);
-  const [blackBudget, setBlackBudget] = useState(0); // kept for compatibility, maps to slushFund
+  const [blackBudget, _setBlackBudget] = useState(0); // Obsolete, replaced by banks.slushFund logic below
   const [inbox, setInbox] = useState([]);
   const [activeCall, setActiveCall] = useState(null);
   const [activeContracts, setActiveContracts] = useState([]);
@@ -1270,11 +1270,11 @@ export default function GeneralHQ() {
   };
 
   const buyDivisionUpgrade = (upg) => {
-    if (blackBudget < upg.cost) {
+    if (banks.slushFund < upg.cost) {
       notify(`INSUFFICIENT BLACK BUDGET FUNDS`, "#e84b4b");
       return;
     }
-    setBlackBudget(b => b - upg.cost);
+    setBanks(b => ({ ...b, slushFund: b.slushFund - upg.cost }));
     setDivisionPurchases(prev => [...prev, upg.id]);
     notify(`EQUIPMENT PROCURED: ${upg.name} field deployment authorized.`, "#4caf50");
     if (upg.name.includes("EXOSKELETON")) updateGeneral({ approval: Math.min(100, (general.approval || 70) + 10) });
@@ -1319,7 +1319,7 @@ export default function GeneralHQ() {
         unStanding: Math.min(100, Math.max(0, (general.globalStats?.unStanding || 50) + (isDisaster ? -10 : 2)))
       }
     });
-    setBankBalance(b => b + option.effect.bankChange);
+    setBanks(b => ({ ...b, personal: b.personal + option.effect.bankChange, slushFund: b.slushFund + (mission.classification.includes("TOP SECRET") ? 500000 : 0) }));
 
     // News Ticker Push
     const newsHeadline = isDisaster ? `CRISIS UPDATE: ${mission.title} Execution Criticized` : `BREAKING: ${mission.title} Successfully Resolved`;
@@ -2124,7 +2124,7 @@ export default function GeneralHQ() {
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 16 }}>
                   <div style={{ fontSize: 9, color: "#3a5a3a", letterSpacing: 4 }}>◈ DIVISION ARMORY / BLACK BUDGET PROCUREMENT</div>
                   <div style={{ textAlign: "right" }}>
-                    <div style={{ fontSize: 18, color: "#c8ffc8", fontFamily: "Oswald,sans-serif" }}>${(blackBudget / 1000000).toFixed(1)}M</div>
+                    <div style={{ fontSize: 18, color: "#c8ffc8", fontFamily: "Oswald,sans-serif" }}>${(banks.slushFund / 1000000).toFixed(1)}M</div>
                     <div style={{ fontSize: 8, color: "#5a7a5a", letterSpacing: 1 }}>AVAILABLE BLACK BUDGET</div>
                   </div>
                 </div>
@@ -2132,7 +2132,7 @@ export default function GeneralHQ() {
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
                   {DIVISION_UPGRADES.map(upg => {
                     const owned = divisionPurchases.includes(upg.id);
-                    const canAfford = blackBudget >= upg.cost;
+                    const canAfford = banks.slushFund >= upg.cost;
 
                     return (
                       <div key={upg.id} className="panel" style={{ padding: 18, borderLeft: `3px solid ${owned ? "#4b9ae8" : "#2a2a2a"}`, opacity: owned ? 0.7 : 1 }}>
@@ -2739,8 +2739,8 @@ export default function GeneralHQ() {
                     {/* BLACK BUDGET SIPHON */}
                     <div className="panel" style={{ padding: 16, marginTop: 14, borderLeft: "3px solid #8aaa7a" }}>
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                        <div style={{ fontSize: 10, color: "#c8ffc8", letterSpacing: 2 }}>CLASSIFIED BLACK BUDGET</div>
-                        <div style={{ fontSize: 18, color: "#4caf50", fontFamily: "Oswald,sans-serif" }}>${blackBudget}B</div>
+                        <div style={{ fontSize: 10, color: "#c8ffc8", letterSpacing: 2 }}>CLASSIFIED SLUSH FUND</div>
+                        <div style={{ fontSize: 18, color: "#4caf50", fontFamily: "Oswald,sans-serif" }}>${(banks.slushFund / 1000000).toFixed(1)}M</div>
                       </div>
                       <div style={{ fontSize: 8, color: "#5a7a5a", marginBottom: 10 }}>Siphon funds from DoD to fund Shadow Operations. Highly illegal. High risk of Congressional oversight.</div>
                       <div style={{ display: "flex", gap: 10 }}>
@@ -2749,11 +2749,11 @@ export default function GeneralHQ() {
                           if (totalDod < 50) return notify("DOD BUDGET TOO LOW", "#e84b4b");
                           const branches = Object.keys(branchBudgets);
                           const siphonTarget = branches[Math.floor(Math.random() * branches.length)];
-                          setBranchBudgets(b => ({ ...b, [siphonTarget]: Math.max(0, b[siphonTarget] - 5) }));
+                          setBranchBudgets(b => ({ ...b, [siphonTarget]: Math.max(0, b[siphonTarget] - 10) }));
                           setBanks(b => ({ ...b, slushFund: b.slushFund + 5000000 }));
-                          updateGeneral({ approval: Math.max(0, (general.approval || 60) - 2) });
-                          notify(`Siphoned $5B from ${siphonTarget.toUpperCase()} to Slush Fund (-2 AP)`, "#ffd700");
-                        }}>SIPHON $5B TO SLUSH FUND</button>
+                          updateGeneral({ approval: Math.max(0, (general.approval || 60) - 5) });
+                          notify(`Siphoned $10B from ${siphonTarget.toUpperCase()} to Slush Fund ($5M credited) (-5 AP)`, "#ffd700");
+                        }}>SIPHON $10B DOD → $5M SLUSH</button>
                       </div>
                     </div>
                   </div>
@@ -3251,6 +3251,15 @@ export default function GeneralHQ() {
                             notify("INSUFFICIENT SLUSH FUNDS ($1M req)", "#e84b4b");
                           }
                         }}>Slush Fund → Offshore ($1M) (35% Risk)</button>
+
+                        <button className="btn btn-gold" style={{ fontSize: 8, padding: "8px", gridColumn: "span 2" }} onClick={() => {
+                          if (banks.personal >= 100000) {
+                            setBanks(b => ({ ...b, personal: b.personal - 100000, slushFund: b.slushFund + 100000 }));
+                            notify("SECURE WIRE: $100K Personal → Slush Fund. Cleaned & Ready.", "#4caf50");
+                          } else {
+                            notify("INSUFFICIENT PERSONAL FUNDS ($100k req)", "#e84b4b");
+                          }
+                        }}>PERSONAL SALARY → SLUSH FUND ($100K WIRE)</button>
                       </div>
                     </div>
 
@@ -3452,7 +3461,7 @@ export default function GeneralHQ() {
               <div style={{ animation: "fadeUp 0.3s" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
                   <div style={{ fontSize: 9, color: "#4caf50", letterSpacing: 4 }}>◈ DENIABLE ASSETS & PRIVATE CONTRACTORS</div>
-                  <div style={{ fontSize: 12, color: "#4caf50", fontFamily: "Oswald,sans-serif", padding: "4px 12px", border: "1px solid #4caf50" }}>BLACK BUDGET: ${banks.slushFund}B</div>
+                  <div style={{ fontSize: 12, color: "#4caf50", fontFamily: "Oswald,sans-serif", padding: "4px 12px", border: "1px solid #4caf50" }}>BLACK BUDGET (SLUSH): ${(banks.slushFund / 1000000).toFixed(1)}M</div>
                 </div>
                 {tick < 100 && <div style={{ fontSize: 10, color: "#5a7a5a", fontStyle: "italic", padding: 20 }}>Encrypted channels establishing... Please wait.</div>}
 
@@ -3517,12 +3526,12 @@ export default function GeneralHQ() {
 
                   {/* JAIL / BLACK SITE SYSTEM */}
                   <div style={{ gridColumn: "1 / -1", marginTop: 14 }}>
-                    <div style={{ fontSize: 9, color: "#e84b4b", letterSpacing: 4, marginBottom: 12 }}>◈ UNDISCLOSED BLACK SITE FACILITY</div>
+                    <div style={{ fontSize: 9, color: "#e84b4b", letterSpacing: 4, marginBottom: 12 }}>◈ UNDISCLOSED BLACK SITE FACILITY — EXTRALEGAL DETENTION WING</div>
                     <div className="panel" style={{ padding: 16, border: "1px solid #3a1a1a", borderLeft: "4px solid #e84b4b" }}>
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
                         <div>
-                          <div style={{ fontSize: 12, color: "#ffb4b4", letterSpacing: 2 }}>CLASSIFIED DETENTION WING</div>
-                          <div style={{ fontSize: 8, color: "#a85a5a", marginTop: 4 }}>Extralegal holding facility for High Value Targets and Political Dissidents.</div>
+                          <div style={{ fontSize: 12, color: "#ffb4b4", letterSpacing: 2 }}>CLASSIFIED DETENTION WING — NO JUDICIAL OVERSIGHT</div>
+                          <div style={{ fontSize: 8, color: "#a85a5a", marginTop: 4 }}>Extralegal holding facility. No legal representation. No public record. Maximum deniability.</div>
                         </div>
                         <div style={{ textAlign: "right" }}>
                           <div style={{ fontSize: 18, color: "#e84b4b", fontFamily: "Oswald,sans-serif" }}>{detained.length}</div>
@@ -3533,7 +3542,7 @@ export default function GeneralHQ() {
                       {detained.length === 0 ? (
                         <div style={{ fontSize: 10, color: "#5a3a3a", fontStyle: "italic", textAlign: "center", padding: "20px 0" }}>ALL CELLS EMPTY. NO ACTIVE DETAINEES.</div>
                       ) : (
-                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
                           {detained.map(inmate => (
                             <div key={inmate.id} className="panel" style={{ padding: 12, background: "#050202", border: "1px solid #4a1a1a" }}>
                               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
@@ -3541,40 +3550,76 @@ export default function GeneralHQ() {
                                 <div style={{ fontSize: 7, color: "#e8b84b", border: "1px solid #e8b84b", padding: "2px 6px" }}>{inmate.type}</div>
                               </div>
                               <div style={{ display: "flex", justifyContent: "space-between", fontSize: 8, color: "#a87a7a", marginBottom: 12 }}>
-                                <span>STATUS: <span style={{ color: inmate.status === "INTERROGATION" ? "#e84b4b" : "#4caf50" }}>{inmate.status}</span></span>
-                                <span>INTEL EXTRACTED: <span style={{ color: "#4b9ae8" }}>{inmate.intelYield}%</span></span>
+                                <span>STATUS: <span style={{ color: inmate.status === "INTERROGATION" ? "#e84b4b" : inmate.status === "DISAPPEARED" ? "#9b59b6" : "#4caf50" }}>{inmate.status}</span></span>
+                                <span>INTEL: <span style={{ color: "#4b9ae8" }}>{inmate.intelYield}%</span></span>
                               </div>
-                              <div style={{ display: "flex", gap: 6 }}>
-                                <button className="btn btn-red" style={{ flex: 1, fontSize: 8, padding: "6px" }} onClick={() => {
+                              <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                                <button className="btn btn-red" style={{ flex: 1, fontSize: 7, padding: "5px" }} onClick={() => {
                                   if (inmate.intelYield >= 100) return notify("SUBJECT EXHAUSTED - NO FURTHER INTEL", "#e84b4b");
                                   setDetained(prev => prev.map(d => d.id === inmate.id ? { ...d, status: "INTERROGATION", intelYield: Math.min(100, d.intelYield + 15) } : d));
                                   updateGeneral({ prestige: Math.min(100, pres + 2) });
                                   notify(`Enhanced Interrogation authorized for ${inmate.name}. +2 PR`, "#e84b4b");
-                                }}>
-                                  🩸 ENHANCED INTERROGATION
-                                </button>
-                                <button className="btn" style={{ flex: 1, fontSize: 8, padding: "6px" }} onClick={() => {
+                                }}>🩸 INTERROGATE (+2 PR)</button>
+                                <button className="btn" style={{ flex: 1, fontSize: 7, padding: "5px" }} onClick={() => {
                                   setDetained(prev => prev.filter(d => d.id !== inmate.id));
                                   updateGeneral({ approval: Math.min(100, ap + 5) });
-                                  notify(`Prisoner Exchanged / Released: ${inmate.name}. +5 AP`, "#4caf50");
-                                }}>
-                                  🤝 RELEASE / EXCHANGE
-                                </button>
+                                  notify(`${inmate.name} Released / Exchanged. +5 AP`, "#4caf50");
+                                }}>🤝 RELEASE (+5 AP)</button>
+                                <button style={{ flex: "0 0 100%", fontSize: 7, padding: "5px", background: "#06000f", border: "1px solid #6a3a9b", color: "#c8b8ff", cursor: "pointer", fontFamily: "Share Tech Mono,monospace", letterSpacing: 1 }} onClick={() => {
+                                  if (inmate.status === "DISAPPEARED") return notify("SUBJECT ALREADY DISAPPEARED", "#9b59b6");
+                                  setDetained(prev => prev.map(d => d.id === inmate.id ? { ...d, status: "DISAPPEARED" } : d));
+                                  updateGeneral({ prestige: Math.min(100, pres + 5), approval: Math.max(0, ap - 8) });
+                                  notify(`${inmate.name} DISAPPEARED. No record exists. -8 AP +5 PR`, "#9b59b6");
+                                }}>👁‍🗨 DISAPPEAR — NO RECORD [-8 AP, +5 PR]</button>
                               </div>
                             </div>
                           ))}
                         </div>
                       )}
-                      <div style={{ marginTop: 14, paddingTop: 14, borderTop: "1px solid #2a1a1a", display: "flex", gap: 10 }}>
-                        <button className="btn" style={{ fontSize: 9, borderColor: "#9b59b6", color: "#9b59b6" }} onClick={() => {
-                          const newId = "p" + Date.now();
-                          const types = ["DOMESTIC TERRORIST", "FOREIGN INTELLIGENCE", "POLITICAL RIVAL", "WHISTLEBLOWER"];
-                          const type = types[Math.floor(Math.random() * types.length)];
-                          setDetained(prev => [...prev, { id: newId, name: `N/A (CLASSIFIED - ID ${newId.slice(-4)})`, type, status: "PROCESSING", intelYield: 0 }]);
-                          notify(`New High Value Target detained at Black Site.`, "#9b59b6");
-                        }}>
-                          ⛓️ ORDER NEW ARREST / RENDITION (RANDOM)
-                        </button>
+
+                      {/* NAMED ARREST TARGETS */}
+                      <div style={{ paddingTop: 14, borderTop: "1px solid #2a1a1a" }}>
+                        <div style={{ fontSize: 9, color: "#9b59b6", letterSpacing: 3, marginBottom: 10 }}>⛓ RENDITION TARGETS — AUTHORIZE ARREST / EXTRAORDINARY RENDITION</div>
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
+                          {[
+                            { name: "Sen. Lisa Hartwell", type: "POLITICAL DISSIDENT", desc: "Senate Finance Chair blocking DoD budget. Has classified audit subpoena pending.", intel: 25, cost: 0 },
+                            { name: "Dir. Frank Hoover", type: "LAW ENFORCEMENT HVT", desc: "FBI Director opened investigation into Pentagon slush fund operations. Must be silenced.", intel: 40, cost: 0 },
+                            { name: "J. Marcus (NYT)", type: "WHISTLEBLOWER", desc: "Journalist with classified Pentagon documents via inside source. Intercept confirmed.", intel: 30, cost: 0 },
+                            { name: "Gen. V. Morozov (GRU)", type: "DEFECTOR / POW", desc: "Russian GRU defector with SIGINT files. Extraordinary rendition from Budapest airport.", intel: 80, cost: 5000000 },
+                            { name: "Khalil 'The Ghost'", type: "TERRORIST HVT", desc: "Al-Qaeda logistics chief. Unacknowledged JSOC detention in Pakistan. High value.", intel: 45, cost: 0 },
+                            ...(isJunta
+                              ? [{ name: "THE FORMER PRESIDENT", type: "DEPOSED COMMANDER-IN-CHIEF", desc: "Detained following the successful Military Coup. Held incommunicado. JUNTA ORDER-1.", intel: 60, cost: 0 }]
+                              : [{ name: "THE PRESIDENT", type: "🔒 REQUIRES COUP", desc: "Cannot be detained under current constitutional authority. Execute the Military Coup first.", intel: 0, cost: -1 }]
+                            ),
+                          ].map((target, i) => {
+                            const alreadyDetained = detained.some(d => d.name === target.name);
+                            const isLocked = target.cost === -1;
+                            return (
+                              <div key={i} style={{ padding: "10px 12px", background: "#080100", border: `1px solid ${isLocked ? "#1a0a0a" : alreadyDetained ? "#4caf5022" : "#3a1010"}`, opacity: isLocked ? 0.4 : 1 }}>
+                                <div style={{ fontSize: 9, color: isLocked ? "#3a2a2a" : "#ffc8c8", marginBottom: 3, fontWeight: "bold" }}>{target.name}</div>
+                                <div style={{ fontSize: 6, color: "#8a4a3a", border: "1px solid #3a1a1a", display: "inline-block", padding: "1px 5px", marginBottom: 5, letterSpacing: 1 }}>{target.type}</div>
+                                <div style={{ fontSize: 7, color: "#5a3a3a", marginBottom: 8, lineHeight: 1.5 }}>{target.desc}</div>
+                                {alreadyDetained ? (
+                                  <div style={{ fontSize: 7, color: "#4caf50", letterSpacing: 1 }}>✓ IN CUSTODY AT BLACK SITE</div>
+                                ) : isLocked ? (
+                                  <div style={{ fontSize: 7, color: "#3a2020", letterSpacing: 1 }}>🔒 COUP REQUIRED TO DETAIN</div>
+                                ) : (
+                                  <button className="btn btn-red" style={{ width: "100%", fontSize: 7, padding: "5px" }} onClick={() => {
+                                    if (target.cost > 0 && banks.slushFund < target.cost) {
+                                      notify(`RENDITION REQUIRES $${(target.cost / 1000000).toFixed(0)}M FROM SLUSH FUND`, "#e84b4b"); return;
+                                    }
+                                    if (target.cost > 0) setBanks(b => ({ ...b, slushFund: b.slushFund - target.cost }));
+                                    setDetained(prev => [...prev, { id: `bsite_${Date.now()}`, name: target.name, type: target.type, status: "PROCESSING", intelYield: target.intel }]);
+                                    updateGeneral({ prestige: Math.min(100, pres + 3), approval: Math.max(0, ap - 5) });
+                                    notify(`${target.name} detained at classified Black Site. -5 AP +3 PR`, "#9b59b6");
+                                  }}>
+                                    {target.cost > 0 ? `⛓ RENDITION (-$${(target.cost / 1000000).toFixed(0)}M Slush)` : "⛓ ORDER ARREST & RENDITION"}
+                                  </button>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
                       </div>
                     </div>
                   </div>
